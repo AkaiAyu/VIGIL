@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+python-multipart
+
+torch
+silero-vad
+
+huggingface-hub
+transformers
+
+librosa
+numpy
