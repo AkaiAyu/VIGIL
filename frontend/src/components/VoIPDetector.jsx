@@ -35,7 +35,6 @@ function VoIPDetector() {
     const [detectionResult, setDetectionResult] = useState(null);
     const [voiceStatus, setVoiceStatus] = useState("standby");
     const [analysisCount, setAnalysisCount] = useState(0);
-    const [captureProgress, setCaptureProgress] = useState(0);
 
     const localStreamRef = useRef(null);
     const peerConnectionRef = useRef(null);
@@ -43,12 +42,20 @@ function VoIPDetector() {
     const remoteAudioRef = useRef(null);
 
     const remoteStreamRef = useRef(null);
-    const remoteRecorderRef = useRef(null);
+
     const detectorEnabledRef = useRef(true);
-    const remoteChunksRef = useRef([]);
-    const remoteWindowTimerRef = useRef(null);
-    const captureProgressIntervalRef = useRef(null);
+
     const remoteWindowNumberRef = useRef(0);
+
+    // PCM remote-audio pipeline
+    const remoteAudioContextRef = useRef(null);
+    const remoteAudioSourceRef = useRef(null);
+    const remotePcmWorkletRef = useRef(null);
+    const remoteSilentGainRef = useRef(null);
+
+    // Detection queue
+    const remoteAnalysisQueueRef = useRef([]);
+    const remoteProcessingRef = useRef(false);
 
     const pendingCandidatesRef = useRef([]);
     const callSessionRef = useRef(0);
@@ -58,7 +65,6 @@ function VoIPDetector() {
     const voipHistorySavedRef = useRef(false);
 
     const voipProcessingRef = useRef(false);
-    const voipEndingRef = useRef(false);
     const voipFinalizeTimerRef = useRef(null);
 
     const cleanup = () => {
@@ -74,39 +80,33 @@ function VoIPDetector() {
         // Invalidate all pending detection requests
         callSessionRef.current += 1;
 
-        if (remoteWindowTimerRef.current) {
 
-            clearTimeout(
-                remoteWindowTimerRef.current
-            );
-
-            remoteWindowTimerRef.current = null;
+        if (remotePcmWorkletRef.current) {
+            remotePcmWorkletRef.current.port.postMessage("reset");
+            remotePcmWorkletRef.current.disconnect();
+            remotePcmWorkletRef.current = null;
         }
 
-
-        if (captureProgressIntervalRef.current) {
-            clearInterval(captureProgressIntervalRef.current);
-            captureProgressIntervalRef.current = null;
+        if (remoteAudioSourceRef.current) {
+            remoteAudioSourceRef.current.disconnect();
+            remoteAudioSourceRef.current = null;
         }
 
-
-        if (remoteRecorderRef.current) {
-
-            if (
-                remoteRecorderRef.current.state ===
-                "recording"
-            ) {
-
-                remoteRecorderRef.current.stop();
-            }
-
-            remoteRecorderRef.current = null;
+        if (remoteSilentGainRef.current) {
+            remoteSilentGainRef.current.disconnect();
+            remoteSilentGainRef.current = null;
         }
 
+        if (remoteAudioContextRef.current) {
+            remoteAudioContextRef.current.close();
+            remoteAudioContextRef.current = null;
+        }
 
         remoteStreamRef.current = null;
 
-        remoteChunksRef.current = [];
+        remoteAnalysisQueueRef.current = [];
+        remoteProcessingRef.current = false;
+
         remoteWindowNumberRef.current = 0;
 
         if (peerConnectionRef.current) {
@@ -145,7 +145,6 @@ function VoIPDetector() {
         setDetectionResult(null);
         setVoiceStatus("standby");
         setAnalysisCount(0);
-        setCaptureProgress(0);
     };
 
 
@@ -156,9 +155,19 @@ function VoIPDetector() {
         }
 
         const stream = await navigator.mediaDevices.getUserMedia({
-            audio: true,
+            audio: {
+                channelCount: 1,
+                echoCancellation: false,
+                noiseSuppression: false,
+                autoGainControl: false,
+            },
             video: false,
         });
+
+        const audioTrack = stream.getAudioTracks()[0];
+
+        console.log("VIGIL VOIP MIC SETTINGS:", audioTrack.getSettings());
+        console.log("VIGIL VOIP MIC CAPABILITIES:", audioTrack.getCapabilities());
 
         localStreamRef.current = stream;
 
@@ -169,6 +178,92 @@ function VoIPDetector() {
         console.log("Caller microphone started.");
 
         return stream;
+    };
+
+
+    const float32ToWavBlob = (
+        samples,
+        sampleRate
+    ) => {
+        const buffer = new ArrayBuffer(
+            44 + samples.length * 2
+        );
+
+        const view = new DataView(buffer);
+
+        const writeString = (offset, string) => {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(
+                    offset + i,
+                    string.charCodeAt(i)
+                );
+            }
+        };
+
+        writeString(0, "RIFF");
+
+        view.setUint32(
+            4,
+            36 + samples.length * 2,
+            true
+        );
+
+        writeString(8, "WAVE");
+        writeString(12, "fmt ");
+
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, 1, true);
+
+        view.setUint32(
+            24,
+            sampleRate,
+            true
+        );
+
+        view.setUint32(
+            28,
+            sampleRate * 2,
+            true
+        );
+
+        view.setUint16(32, 2, true);
+        view.setUint16(34, 16, true);
+
+        writeString(36, "data");
+
+        view.setUint32(
+            40,
+            samples.length * 2,
+            true
+        );
+
+        let offset = 44;
+
+        for (let i = 0; i < samples.length; i++) {
+            const sample = Math.max(
+                -1,
+                Math.min(1, samples[i])
+            );
+
+            const value =
+                sample < 0
+                    ? sample * 0x8000
+                    : sample * 0x7fff;
+
+            view.setInt16(
+                offset,
+                value,
+                true
+            );
+
+            offset += 2;
+        }
+
+        return new Blob(
+            [view],
+            { type: "audio/wav" }
+        );
     };
 
 
@@ -202,7 +297,7 @@ function VoIPDetector() {
             formData.append(
                 "file",
                 blob,
-                `voip_window_${windowNumber}.webm`
+                `voip_window_${windowNumber}.wav`
             );
 
             console.log(
@@ -303,8 +398,37 @@ function VoIPDetector() {
     };
 
 
-    const startRemoteAudioWindow = (stream) => {
+    const processRemoteAnalysisQueue = async () => {
+        if (remoteProcessingRef.current) {
+            return;
+        }
 
+        remoteProcessingRef.current = true;
+
+        try {
+            while (
+                remoteAnalysisQueueRef.current.length > 0
+            ) {
+                const item =
+                    remoteAnalysisQueueRef.current.shift();
+
+                if (!item) {
+                    continue;
+                }
+
+                await analyzeRemoteAudioWindow(
+                    item.blob,
+                    item.windowNumber,
+                    item.sessionId
+                );
+            }
+        } finally {
+            remoteProcessingRef.current = false;
+        }
+    };
+
+
+    const startRemotePCMRecording = async (stream) => {
         const sessionId = callSessionRef.current;
 
         if (!detectorEnabledRef.current) {
@@ -315,171 +439,151 @@ function VoIPDetector() {
             return;
         }
 
-
         if (!stream.getAudioTracks().length) {
-
             console.error(
                 "Remote stream has no audio tracks."
             );
-
             return;
         }
 
-
-        let recorder;
-
         try {
+            console.log(
+                "Starting VIGIL PCM analysis of remote WebRTC audio."
+            );
 
-            recorder = new MediaRecorder(
-                stream,
-                {
-                    mimeType: "audio/webm;codecs=opus",
+            // Create AudioContext
+            const audioContext =
+                new AudioContext();
+
+            remoteAudioContextRef.current =
+                audioContext;
+
+            if (audioContext.state === "suspended") {
+                await audioContext.resume();
+            }
+
+            console.log(
+                "REMOTE AUDIO SAMPLE RATE:",
+                audioContext.sampleRate
+            );
+
+            // Load the same AudioWorklet used by Live Voice
+            await audioContext.audioWorklet.addModule(
+                "/src/pcm-recorder-worklet.js"
+            );
+
+            const source =
+                audioContext.createMediaStreamSource(
+                    stream
+                );
+
+            remoteAudioSourceRef.current =
+                source;
+
+            const worklet =
+                new AudioWorkletNode(
+                    audioContext,
+                    "pcm-recorder-processor"
+                );
+
+            remotePcmWorkletRef.current =
+                worklet;
+
+            // Keep the AudioWorklet alive without
+            // sending remote audio to the speakers.
+            const silentGain =
+                audioContext.createGain();
+
+            silentGain.gain.value = 0;
+
+            remoteSilentGainRef.current =
+                silentGain;
+
+            source.connect(worklet);
+            worklet.connect(silentGain);
+            silentGain.connect(
+                audioContext.destination
+            );
+
+            worklet.port.onmessage = (event) => {
+                if (event.data?.type !== "audio") {
+                    return;
                 }
+
+                if (!detectorEnabledRef.current) {
+                    return;
+                }
+
+                const samples =
+                    event.data.samples;
+
+                const sampleRate =
+                    event.data.sampleRate;
+
+                if (!samples || !samples.length) {
+                    return;
+                }
+
+                const duration =
+                    samples.length / sampleRate;
+
+                console.log(
+                    "VOIP PCM WINDOW:",
+                    {
+                        samples: samples.length,
+                        sampleRate,
+                        duration,
+                    }
+                );
+
+                const blob =
+                    float32ToWavBlob(
+                        samples,
+                        sampleRate
+                    );
+
+                const windowNumber =
+                    remoteWindowNumberRef.current;
+
+                remoteWindowNumberRef.current += 1;
+
+                remoteAnalysisQueueRef.current.push({
+                    blob,
+                    windowNumber,
+                    sessionId,
+                });
+
+                processRemoteAnalysisQueue();
+            };
+
+            worklet.port.onmessageerror = (error) => {
+                console.error(
+                    "Remote PCM worklet message error:",
+                    error
+                );
+            };
+
+            worklet.onprocessorerror = (error) => {
+                console.error(
+                    "Remote PCM processor error:",
+                    error
+                );
+            };
+
+            console.log(
+                "Started 4-second remote PCM analysis."
             );
 
         } catch (error) {
-
             console.error(
-                "Preferred MediaRecorder format failed:",
+                "Failed to start remote PCM analysis:",
                 error
             );
 
-            recorder = new MediaRecorder(stream);
+            setError(
+                `Remote audio analysis failed: ${error.message}`
+            );
         }
-
-
-        remoteRecorderRef.current =
-            recorder;
-
-        remoteChunksRef.current = [];
-
-
-        recorder.ondataavailable = (event) => {
-
-            if (
-                event.data &&
-                event.data.size > 0
-            ) {
-
-                remoteChunksRef.current.push(
-                    event.data
-                );
-            }
-        };
-
-
-        recorder.onstop = async () => {
-
-            const chunks =
-                remoteChunksRef.current;
-
-            remoteChunksRef.current = [];
-
-            // Detector was disabled while this window was recording.
-            // Do not send this audio to the backend.
-            if (!detectorEnabledRef.current) {
-                console.log(
-                    "VIGIL detector disabled. Skipping audio analysis."
-                );
-                return;
-            }
-
-            if (chunks.length === 0) {
-
-                console.log(
-                    "No remote audio data captured."
-                );
-
-                return;
-            }
-
-
-            const blob = new Blob(
-                chunks,
-                {
-                    type:
-                        recorder.mimeType ||
-                        "audio/webm",
-                }
-            );
-
-
-            const windowNumber =
-                remoteWindowNumberRef.current;
-
-
-            remoteWindowNumberRef.current += 1;
-
-
-            console.log(
-                `Remote audio window ${windowNumber} captured:`,
-                blob.size,
-                "bytes"
-            );
-
-
-            await analyzeRemoteAudioWindow(
-                blob,
-                windowNumber,
-                sessionId
-            );
-
-
-            // Start the next window
-            if (
-                detectorEnabledRef.current &&
-                !voipEndingRef.current &&
-                peerConnectionRef.current &&
-                peerConnectionRef.current.connectionState ===
-                "connected"
-            ) {
-                startRemoteAudioWindow(stream);
-            }
-        };
-
-
-        recorder.onerror = (event) => {
-
-            console.error(
-                "Remote MediaRecorder error:",
-                event.error
-            );
-        };
-
-        setCaptureProgress(0);
-
-        captureProgressIntervalRef.current = setInterval(() => {
-            setCaptureProgress((previous) => {
-                if (previous >= 100) {
-                    clearInterval(captureProgressIntervalRef.current);
-                    captureProgressIntervalRef.current = null;
-                    return 100;
-                }
-
-                return previous + 2.5;
-            });
-        }, 100);
-
-        recorder.start();
-
-        console.log(
-            "Started 4-second remote audio window."
-        );
-
-
-        remoteWindowTimerRef.current =
-            setTimeout(() => {
-
-                if (
-                    recorder &&
-                    recorder.state === "recording"
-                ) {
-
-                    recorder.stop();
-
-                }
-
-            }, 4000);
     };
 
 
@@ -559,7 +663,7 @@ function VoIPDetector() {
 
             remoteWindowNumberRef.current = 0;
 
-            startRemoteAudioWindow(
+            startRemotePCMRecording(
                 remoteStream
             );
         };
@@ -728,7 +832,6 @@ function VoIPDetector() {
             voipSessionResultsRef.current = [];
             voipSessionStartRef.current = Date.now();
             voipHistorySavedRef.current = false;
-            voipEndingRef.current = false;
 
             console.log("Starting VIGIL VoIP session...");
 
@@ -919,26 +1022,6 @@ function VoIPDetector() {
                         "The other participant ended the call."
                     );
 
-                    voipEndingRef.current = true;
-
-                    if (remoteWindowTimerRef.current) {
-                        clearTimeout(
-                            remoteWindowTimerRef.current
-                        );
-
-                        remoteWindowTimerRef.current = null;
-                    }
-
-                    const recorder =
-                        remoteRecorderRef.current;
-
-                    if (
-                        recorder &&
-                        recorder.state !== "inactive"
-                    ) {
-                        recorder.stop();
-                    }
-
                     finalizeVoipSession();
 
                     return;
@@ -995,19 +1078,117 @@ function VoIPDetector() {
             return;
         }
 
-        const strongestResult =
-            results.reduce(
-                (strongest, current) =>
-                    current.aiProbability >
-                        strongest.aiProbability
-                        ? current
-                        : strongest
+        // --------------------------------------------------
+        // Only speech windows participate in the
+        // session-level AI/Genuine decision.
+        //
+        // Silence windows are never stored in
+        // voipSessionResultsRef because VAD filters them
+        // before DF-Arena analysis.
+        // --------------------------------------------------
+
+        const speechResults = results.filter(
+            (result) =>
+                result.verdict === "AI" ||
+                result.verdict === "GENUINE"
+        );
+
+        if (speechResults.length === 0) {
+            return;
+        }
+
+        // --------------------------------------------------
+        // WINDOW COUNTS
+        //
+        // remoteWindowNumberRef is incremented whenever
+        // a complete 4-second remote audio window is
+        // captured.
+        // --------------------------------------------------
+
+        const totalWindows =
+            remoteWindowNumberRef.current;
+
+        const speechWindows =
+            speechResults.length;
+
+        const aiWindows =
+            speechResults.filter(
+                (result) => result.verdict === "AI"
+            ).length;
+
+        const genuineWindows =
+            speechResults.filter(
+                (result) => result.verdict === "GENUINE"
+            ).length;
+
+        const silenceWindows =
+            Math.max(
+                0,
+                totalWindows - speechWindows
             );
 
-        const aiDetected = results.some(
-            (result) =>
-                result.verdict === "AI"
-        );
+        // --------------------------------------------------
+        // SESSION-LEVEL AI PROBABILITY
+        //
+        // Average the AI probability of ALL speech
+        // windows.
+        //
+        // A single extreme window does NOT decide the
+        // complete VoIP session.
+        // --------------------------------------------------
+
+        const averageAiProbability =
+            speechResults.reduce(
+                (sum, result) =>
+                    sum +
+                    Number(
+                        result.aiProbabilityAverage || 0
+                    ),
+                0
+            ) / speechResults.length;
+
+        const averageGenuineProbability =
+            100 - averageAiProbability;
+
+        // --------------------------------------------------
+        // HIGHEST SINGLE-WINDOW AI SCORE
+        //
+        // Kept only as forensic information.
+        // It does NOT decide the session verdict.
+        // --------------------------------------------------
+
+        const peakAiProbability =
+            Math.max(
+                ...speechResults.map(
+                    (result) =>
+                        Number(
+                            result.aiProbability || 0
+                        )
+                )
+            );
+
+        // --------------------------------------------------
+        // FINAL SESSION VERDICT
+        //
+        // SAME LOGIC AS LIVE VOICE
+        // --------------------------------------------------
+
+        const AI_THRESHOLD = 45;
+
+        const isAI =
+            averageAiProbability >= AI_THRESHOLD;
+
+        // --------------------------------------------------
+        // SESSION CONFIDENCE
+        // --------------------------------------------------
+
+        const sessionConfidence = isAI
+            ? averageAiProbability
+            : averageGenuineProbability;
+
+        // --------------------------------------------------
+        // SESSION DURATION
+        // --------------------------------------------------
 
         const duration =
             voipSessionStartRef.current
@@ -1015,8 +1196,12 @@ function VoIPDetector() {
                     (Date.now() -
                         voipSessionStartRef.current) /
                     1000
-                ).toFixed(1)
+                )
                 : 0;
+
+        // --------------------------------------------------
+        // SAVE TO HISTORY
+        // --------------------------------------------------
 
         if (isHistoryAutoSaveEnabled()) {
 
@@ -1024,45 +1209,86 @@ function VoIPDetector() {
 
                 source: "VoIP Monitor",
 
-                verdict: aiDetected
+                // Final session verdict
+                verdict: isAI
                     ? "AI"
                     : "GENUINE",
 
-                confidence: Number(
-                    strongestResult.confidence ||
-                    strongestResult.aiProbability ||
-                    0
-                ),
+                // Aggregate session confidence
+                confidence:
+                    Number(
+                        sessionConfidence.toFixed(2)
+                    ),
 
-                peakAi: Number(
-                    strongestResult.aiProbability || 0
-                ),
+                // Aggregate probabilities
+                averageAi:
+                    Number(
+                        averageAiProbability.toFixed(2)
+                    ),
 
-                averageAi: Number(
-                    strongestResult.aiProbabilityAverage || 0
-                ),
+                genuineProbability:
+                    Number(
+                        averageGenuineProbability.toFixed(2)
+                    ),
 
-                genuineProbability: Number(
-                    strongestResult.genuineProbability ||
-                    0
-                ),
+                // Highest individual window score
+                // for forensic reference only
+                peakAi:
+                    Number(
+                        peakAiProbability.toFixed(2)
+                    ),
 
-                duration: Number(duration),
-
+                // Window statistics
                 windowsAnalyzed:
-                    results.length,
+                    totalWindows,
+
+                speechWindows:
+                    speechWindows,
+
+                aiWindows:
+                    aiWindows,
+
+                genuineWindows:
+                    genuineWindows,
+
+                silenceWindows:
+                    silenceWindows,
+
+                // Threshold used for session decision
+                threshold:
+                    AI_THRESHOLD,
+
+                duration:
+                    Number(
+                        duration.toFixed(1)
+                    ),
 
                 model:
-                    strongestResult.model ||
+                    speechResults[0]?.model ||
                     "DF-Arena 1B",
             });
-
         }
 
         voipHistorySavedRef.current = true;
 
         console.log(
-            "VIGIL VoIP session saved to history."
+            "VIGIL VoIP session saved to history:",
+            {
+                verdict: isAI
+                    ? "AI"
+                    : "GENUINE",
+
+                averageAiProbability,
+                averageGenuineProbability,
+
+                peakAiProbability,
+
+                totalWindows,
+                speechWindows,
+                aiWindows,
+                genuineWindows,
+                silenceWindows,
+            }
         );
     };
 
@@ -1073,20 +1299,12 @@ function VoIPDetector() {
             return;
         }
 
-        const recorder =
-            remoteRecorderRef.current;
-
-        const recorderStillActive =
-            recorder &&
-            recorder.state !== "inactive";
-
         const analysisStillProcessing =
-            voipProcessingRef.current;
+            voipProcessingRef.current ||
+            remoteProcessingRef.current ||
+            remoteAnalysisQueueRef.current.length > 0;
 
-        if (
-            recorderStillActive ||
-            analysisStillProcessing
-        ) {
+        if (analysisStillProcessing) {
             voipFinalizeTimerRef.current =
                 setTimeout(
                     finalizeVoipSession,
@@ -1107,36 +1325,10 @@ function VoIPDetector() {
 
 
     const endCall = () => {
-
         console.log(
             "Ending VoIP call and waiting for final analysis..."
         );
 
-        // Tell the recorder that no more windows
-        // should be created.
-        voipEndingRef.current = true;
-
-        // Stop the current 4-second capture window.
-        if (remoteWindowTimerRef.current) {
-            clearTimeout(
-                remoteWindowTimerRef.current
-            );
-
-            remoteWindowTimerRef.current = null;
-        }
-
-        const recorder =
-            remoteRecorderRef.current;
-
-        if (
-            recorder &&
-            recorder.state !== "inactive"
-        ) {
-            recorder.stop();
-        }
-
-        // Wait until the recorder's onstop callback
-        // and backend analysis have completed.
         finalizeVoipSession();
     };
 
@@ -1176,7 +1368,7 @@ function VoIPDetector() {
     };
 
 
-    const toggleDetector = () => {
+    const toggleDetector = async () => {
         if (
             callRole !== "monitor" ||
             !isConnected
@@ -1197,41 +1389,45 @@ function VoIPDetector() {
                 "VIGIL detector disabled."
             );
 
-            // Stop the current detection window.
-            if (remoteWindowTimerRef.current) {
-                clearTimeout(
-                    remoteWindowTimerRef.current
+            // Stop the current PCM worklet.
+            if (remotePcmWorkletRef.current) {
+                remotePcmWorkletRef.current.port.postMessage(
+                    "reset"
                 );
 
-                remoteWindowTimerRef.current = null;
+                remotePcmWorkletRef.current.disconnect();
+                remotePcmWorkletRef.current = null;
             }
 
-            // Stop the current recorder.
-            const recorder =
-                remoteRecorderRef.current;
-
-            if (
-                recorder &&
-                recorder.state !== "inactive"
-            ) {
-                recorder.stop();
+            // Disconnect the remote audio source.
+            if (remoteAudioSourceRef.current) {
+                remoteAudioSourceRef.current.disconnect();
+                remoteAudioSourceRef.current = null;
             }
 
-            // Stop the visual capture progress.
-            if (
-                captureProgressIntervalRef.current
-            ) {
-                clearInterval(
-                    captureProgressIntervalRef.current
-                );
-
-                captureProgressIntervalRef.current =
-                    null;
+            // Disconnect the silent output node.
+            if (remoteSilentGainRef.current) {
+                remoteSilentGainRef.current.disconnect();
+                remoteSilentGainRef.current = null;
             }
 
-            remoteChunksRef.current = [];
+            // Close the AudioContext completely.
+            if (remoteAudioContextRef.current) {
+                try {
+                    await remoteAudioContextRef.current.close();
+                } catch (error) {
+                    console.warn(
+                        "Could not close remote AudioContext:",
+                        error
+                    );
+                }
 
-            setCaptureProgress(0);
+                remoteAudioContextRef.current = null;
+            }
+
+            // Discard any queued windows.
+            remoteAnalysisQueueRef.current = [];
+
             setVoiceStatus("standby");
             setDetectionResult(null);
 
@@ -1240,9 +1436,9 @@ function VoIPDetector() {
                 "VIGIL detector enabled."
             );
 
-            // Start a fresh detection window.
+            // Start a fresh detection pipeline.
             if (remoteStreamRef.current) {
-                startRemoteAudioWindow(
+                await startRemotePCMRecording(
                     remoteStreamRef.current
                 );
             }
@@ -1511,46 +1707,6 @@ function VoIPDetector() {
                     )}
 
                 </div>
-
-                {callRole === "monitor" &&
-                    isConnected &&
-                    voiceStatus !== "analyzing" &&
-                    voiceStatus !== "silence" && (
-
-                        <div className="voip-capture-status">
-
-                            <div className="voip-capture-header">
-
-                                <span>
-                                    ● RECEIVING REMOTE VOICE
-                                </span>
-
-                                <span>
-                                    {Math.round(captureProgress)}%
-                                </span>
-
-                            </div>
-
-                            <div className="voip-capture-bar">
-
-                                <div
-                                    className="voip-capture-progress"
-                                    style={{
-                                        width: `${captureProgress}%`
-                                    }}
-                                />
-
-                            </div>
-
-                            <div className="voip-capture-subtitle">
-
-                                Capturing 4-second analysis window...
-
-                            </div>
-
-                        </div>
-
-                    )}
 
                 {voiceStatus === "analyzing" && (
 
