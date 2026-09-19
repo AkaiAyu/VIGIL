@@ -1,10 +1,7 @@
-from pathlib import Path
-
 import numpy as np
 import torch
 from huggingface_hub import snapshot_download
 from transformers import pipeline
-
 
 # ============================================================
 # CONFIGURATION
@@ -18,25 +15,26 @@ SAMPLE_RATE = 16000
 # 64,600 / 16,000 ≈ 4.04 seconds
 WINDOW_SAMPLES = 64600
 
-# 2-second hop = 50% overlap
-HOP_SAMPLES = 32000
+# Non-overlapping windows
+HOP_SAMPLES = WINDOW_SAMPLES
 
 # Minimum useful audio length
 MIN_AUDIO_SAMPLES = 16000
 
-# Final decision threshold
+# Final decision threshold.
 #
-# If ANY analyzed window reaches this AI probability,
-# we classify the recording as AI.
+# The recording verdict is based on the average AI
+# probability across all analyzed windows.
 #
-# Based on our current 38-sample evaluation:
-# 45% produced 100% accuracy.
+# The maximum single-window probability is retained
+# separately as forensic information.
 AI_THRESHOLD = 0.45
 
 
 # ============================================================
 # VOICE DETECTOR
 # ============================================================
+
 
 class VoiceDetector:
 
@@ -50,9 +48,7 @@ class VoiceDetector:
 
         if torch.cuda.is_available():
             self.device = "cuda:0"
-            print(
-                f"Using GPU: {torch.cuda.get_device_name(0)}"
-            )
+            print(f"Using GPU: {torch.cuda.get_device_name(0)}")
         else:
             self.device = "cpu"
             print("CUDA not available. Using CPU.")
@@ -63,13 +59,9 @@ class VoiceDetector:
 
         print("Checking DF-Arena 1B model...")
 
-        self.model_path = snapshot_download(
-            repo_id=MODEL_ID
-        )
+        self.model_path = snapshot_download(repo_id=MODEL_ID)
 
-        print(
-            f"Model path: {self.model_path}"
-        )
+        print(f"Model path: {self.model_path}")
 
         # ----------------------------------------------------
         # Load model
@@ -101,37 +93,25 @@ class VoiceDetector:
 
         if isinstance(result, dict):
 
-            spoof_probability = result.get(
-                "all_scores",
-                {}
-            ).get(
-                "spoof",
-                result.get("score", 0.0)
+            spoof_probability = result.get("all_scores", {}).get(
+                "spoof", result.get("score", 0.0)
             )
 
-            bonafide_probability = result.get(
-                "all_scores",
-                {}
-            ).get(
-                "bonafide",
-                1.0 - spoof_probability
+            bonafide_probability = result.get("all_scores", {}).get(
+                "bonafide", 1.0 - spoof_probability
             )
 
         else:
 
-            raise RuntimeError(
-                f"Unexpected detector output: {result}"
-            )
+            raise RuntimeError(f"Unexpected detector output: {result}")
 
         return {
             "ai_probability": float(spoof_probability),
-            "genuine_probability": float(
-                bonafide_probability
-            ),
+            "genuine_probability": float(bonafide_probability),
         }
 
     # ========================================================
-    # CREATE OVERLAPPING WINDOWS
+    # CREATE NON-OVERLAPPING WINDOWS
     # ========================================================
 
     def _create_windows(self, audio):
@@ -145,8 +125,7 @@ class VoiceDetector:
         if audio_length < MIN_AUDIO_SAMPLES:
 
             raise ValueError(
-                "Audio is too short. "
-                "At least 1 second of audio is required."
+                "Audio is too short. " "At least 1 second of audio is required."
             )
 
         windows = []
@@ -157,10 +136,7 @@ class VoiceDetector:
 
         if audio_length <= WINDOW_SAMPLES:
 
-            window = np.zeros(
-                WINDOW_SAMPLES,
-                dtype=np.float32
-            )
+            window = np.zeros(WINDOW_SAMPLES, dtype=np.float32)
 
             window[:audio_length] = audio
 
@@ -175,7 +151,7 @@ class VoiceDetector:
             return windows
 
         # ----------------------------------------------------
-        # Normal overlapping windows
+        # Normal non-overlapping windows
         # ----------------------------------------------------
 
         start = 0
@@ -192,20 +168,15 @@ class VoiceDetector:
 
             if len(window) < WINDOW_SAMPLES:
 
-                padded_window = np.zeros(
-                    WINDOW_SAMPLES,
-                    dtype=np.float32
-                )
+                padded_window = np.zeros(WINDOW_SAMPLES, dtype=np.float32)
 
-                padded_window[:len(window)] = window
+                padded_window[: len(window)] = window
 
                 window = padded_window
 
             windows.append(
                 {
-                    "audio": window.astype(
-                        np.float32
-                    ),
+                    "audio": window.astype(np.float32),
                     "start": start,
                     "end": end,
                 }
@@ -234,19 +205,13 @@ class VoiceDetector:
 
         if not isinstance(audio, np.ndarray):
 
-            raise TypeError(
-                "Audio must be a NumPy array."
-            )
+            raise TypeError("Audio must be a NumPy array.")
 
         if audio.ndim != 1:
 
-            raise ValueError(
-                "Audio must be mono (1-dimensional)."
-            )
+            raise ValueError("Audio must be mono (1-dimensional).")
 
-        audio = audio.astype(
-            np.float32
-        )
+        audio = audio.astype(np.float32)
 
         # ----------------------------------------------------
         # Create windows
@@ -254,9 +219,7 @@ class VoiceDetector:
 
         windows = self._create_windows(audio)
 
-        print(
-            f"Analyzing {len(windows)} audio windows..."
-        )
+        print(f"Analyzing {len(windows)} audio windows...")
 
         window_results = []
 
@@ -267,20 +230,11 @@ class VoiceDetector:
         # Analyze every window
         # ----------------------------------------------------
 
-        for index, window_data in enumerate(
-            windows,
-            start=1
-        ):
+        for index, window_data in enumerate(windows, start=1):
 
-            start_seconds = (
-                window_data["start"]
-                / SAMPLE_RATE
-            )
+            start_seconds = window_data["start"] / SAMPLE_RATE
 
-            end_seconds = (
-                window_data["end"]
-                / SAMPLE_RATE
-            )
+            end_seconds = window_data["end"] / SAMPLE_RATE
 
             print(
                 f"Window {index}/{len(windows)} "
@@ -288,91 +242,60 @@ class VoiceDetector:
                 f"{end_seconds:.2f}s)"
             )
 
-            result = self._analyze_window(
-                window_data["audio"]
-            )
+            result = self._analyze_window(window_data["audio"])
 
-            ai_probability = result[
-                "ai_probability"
-            ]
+            ai_probability = result["ai_probability"]
 
-            genuine_probability = result[
-                "genuine_probability"
-            ]
+            genuine_probability = result["genuine_probability"]
 
-            ai_scores.append(
-                ai_probability
-            )
+            ai_scores.append(ai_probability)
 
-            genuine_scores.append(
-                genuine_probability
-            )
+            genuine_scores.append(genuine_probability)
 
             window_results.append(
                 {
-                    "start": round(
-                        start_seconds,
-                        2
-                    ),
-                    "end": round(
-                        end_seconds,
-                        2
-                    ),
-                    "ai_probability": round(
-                        ai_probability * 100,
-                        2
-                    ),
-                    "genuine_probability": round(
-                        genuine_probability * 100,
-                        2
-                    ),
+                    "start": round(start_seconds, 2),
+                    "end": round(end_seconds, 2),
+                    "ai_probability": round(ai_probability * 100, 2),
+                    "genuine_probability": round(genuine_probability * 100, 2),
                 }
             )
 
-            print(
-                f"  AI: "
-                f"{ai_probability * 100:.2f}%"
-            )
+            print(f"  AI: " f"{ai_probability * 100:.2f}%")
 
-            print(
-                f"  Genuine: "
-                f"{genuine_probability * 100:.2f}%"
-            )
+            print(f"  Genuine: " f"{genuine_probability * 100:.2f}%")
 
         # ====================================================
         # AGGREGATION
         # ====================================================
 
-        average_ai = float(
-            np.mean(ai_scores)
-        )
+        average_ai = float(np.mean(ai_scores))
 
-        average_genuine = float(
-            np.mean(genuine_scores)
-        )
+        average_genuine = float(np.mean(genuine_scores))
 
-        maximum_ai = float(
-            np.max(ai_scores)
-        )
+        maximum_ai = float(np.max(ai_scores))
 
         # ----------------------------------------------------
-        # NEW DECISION LOGIC
+        # FINAL DECISION LOGIC
         #
-        # Use the strongest AI window rather than averaging
-        # all windows together.
+        # Use the average AI probability across all
+        # analyzed windows for the final recording verdict.
+        #
+        # The highest single-window AI score is retained
+        # separately as forensic information only.
         # ----------------------------------------------------
 
-        if maximum_ai >= AI_THRESHOLD:
+        if average_ai >= AI_THRESHOLD:
 
             verdict = "AI"
 
-            confidence = maximum_ai
+            confidence = average_ai
 
         else:
 
             verdict = "GENUINE"
 
-            confidence = 1.0 - maximum_ai
+            confidence = 1.0 - average_ai
 
         # ====================================================
         # RETURN RESULT
@@ -380,109 +303,12 @@ class VoiceDetector:
 
         return {
             "verdict": verdict,
-
-            "confidence": round(
-                confidence * 100,
-                2
-            ),
-
-            "ai_probability": round(
-                average_ai * 100,
-                2
-            ),
-
-            "genuine_probability": round(
-                average_genuine * 100,
-                2
-            ),
-
-            "maximum_ai_probability": round(
-                maximum_ai * 100,
-                2
-            ),
-
-            "threshold": round(
-                AI_THRESHOLD * 100,
-                2
-            ),
-
-            "windows_analyzed": len(
-                window_results
-            ),
-
+            "confidence": round(confidence * 100, 2),
+            "ai_probability": round(average_ai * 100, 2),
+            "genuine_probability": round(average_genuine * 100, 2),
+            "maximum_ai_probability": round(maximum_ai * 100, 2),
+            "threshold": round(AI_THRESHOLD * 100, 2),
+            "windows_analyzed": len(window_results),
             "window_results": window_results,
-
             "model": "DF-Arena 1B",
         }
-
-
-# ============================================================
-# TESTING
-# ============================================================
-
-if __name__ == "__main__":
-
-    from utils.audio_utils import load_audio
-
-    TEST_AUDIO = "test.mp3"
-
-    print("=" * 60)
-    print("VIGIL DF-ARENA 1B DETECTOR TEST")
-    print("=" * 60)
-
-    detector = VoiceDetector()
-
-    audio, sample_rate = load_audio(
-        TEST_AUDIO
-    )
-
-    print(
-        f"\nAudio duration: "
-        f"{len(audio) / sample_rate:.2f} seconds"
-    )
-
-    result = detector.detect(
-        audio
-    )
-
-    print("\n")
-    print("=" * 60)
-    print("FINAL RESULT")
-    print("=" * 60)
-
-    print(
-        f"Verdict: "
-        f"{result['verdict']}"
-    )
-
-    print(
-        f"Confidence: "
-        f"{result['confidence']}%"
-    )
-
-    print(
-        f"Average AI probability: "
-        f"{result['ai_probability']}%"
-    )
-
-    print(
-        f"Maximum AI probability: "
-        f"{result['maximum_ai_probability']}%"
-    )
-
-    print(
-        f"Threshold: "
-        f"{result['threshold']}%"
-    )
-
-    print(
-        f"Windows analyzed: "
-        f"{result['windows_analyzed']}"
-    )
-
-    print(
-        f"Model: "
-        f"{result['model']}"
-    )
-
-    print("=" * 60)

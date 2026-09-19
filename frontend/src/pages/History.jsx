@@ -276,7 +276,7 @@ function History() {
                                                 undefined && (
 
                                                     <span>
-                                                        WINDOWS:{" "}
+                                                        TOTAL WINDOWS:{" "}
                                                         {
                                                             entry.windowsAnalyzed
                                                         }
@@ -292,7 +292,7 @@ function History() {
                                     {isConfidenceVisible() && (
                                         <div className="history-confidence">
                                             <div className="history-confidence-label">
-                                                CONFIDENCE
+                                                SESSION CONFIDENCE
                                             </div>
 
                                             <div className="history-confidence-value">
@@ -411,7 +411,7 @@ function History() {
                                             <div className="history-detail-card">
 
                                                 <span>
-                                                    WINDOWS ANALYZED
+                                                    TOTAL WINDOWS
                                                 </span>
 
                                                 <strong>
@@ -424,10 +424,69 @@ function History() {
                                             </div>
 
 
+                                            {entry.speechWindows !== undefined && (
+                                                <div className="history-detail-card">
+
+                                                    <span>
+                                                        SPEECH WINDOWS
+                                                    </span>
+
+                                                    <strong>
+                                                        {entry.speechWindows}
+                                                    </strong>
+
+                                                </div>
+                                            )}
+
+                                            {entry.aiWindows !== undefined && (
+                                                <div className="history-detail-card">
+
+                                                    <span>
+                                                        AI / SPOOF WINDOWS
+                                                    </span>
+
+                                                    <strong className="history-ai-text">
+                                                        {entry.aiWindows}
+                                                    </strong>
+
+                                                </div>
+                                            )}
+
+                                            {entry.genuineWindows !== undefined && (
+                                                <div className="history-detail-card">
+
+                                                    <span>
+                                                        GENUINE WINDOWS
+                                                    </span>
+
+                                                    <strong className="history-genuine-text">
+                                                        {entry.genuineWindows}
+                                                    </strong>
+
+                                                </div>
+                                            )}
+
+                                            {entry.silenceWindows !== undefined && (
+                                                <div className="history-detail-card">
+
+                                                    <span>
+                                                        SILENCE WINDOWS
+                                                    </span>
+
+                                                    <strong>
+                                                        {entry.silenceWindows}
+                                                    </strong>
+
+                                                </div>
+                                            )}
+
+
                                             {isConfidenceVisible() && (
                                                 <div className="history-detail-card">
                                                     <span>
-                                                        PEAK AI SCORE
+                                                        <span>
+                                                            HIGHEST SINGLE-WINDOW AI SCORE
+                                                        </span>
                                                     </span>
 
                                                     <strong className="history-ai-text">

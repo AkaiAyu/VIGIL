@@ -274,36 +274,59 @@ function AudioAnalyzer() {
                 );
             }
 
+            // Handle files that contain no usable speech.
+            if (
+                data.speech_detected === false ||
+                !data.detection
+            ) {
+                setAnalysisResult(null);
+
+                setError(
+                    data.message ||
+                    "No usable speech was detected in this audio file."
+                );
+
+                return;
+            }
+
             setAnalysisResult(data.detection);
 
             if (isHistoryAutoSaveEnabled()) {
-
                 saveHistory({
                     source: "Audio Upload",
                     filename: audioFile.name,
-                    verdict: data.detection.verdict,
+
+                    verdict:
+                        data.detection.verdict,
+
                     confidence: Number(
                         data.detection.confidence
                     ),
+
                     peakAi: Number(
                         data.detection.maximum_ai_probability
                     ),
+
                     averageAi: Number(
                         data.detection.ai_probability
                     ),
+
                     genuineProbability: Number(
                         data.detection.genuine_probability
                     ),
+
                     windowsAnalyzed: Number(
                         data.detection.windows_analyzed
                     ),
+
                     duration: Number(duration),
+
                     model:
                         data.detection.model ||
                         "DF-Arena 1B",
                 });
-
             }
+
         } catch (error) {
             console.error(
                 "VIGIL analysis error:",
@@ -314,10 +337,13 @@ function AudioAnalyzer() {
                 error.message ||
                 "Unable to connect to VIGIL backend."
             );
+
         } finally {
             setIsAnalyzing(false);
         }
     };
+
+
     /* ==========================================================
        RESET
        ========================================================== */
@@ -858,7 +884,9 @@ function AudioAnalyzer() {
                                     <span className="result-score-description">
                                         {analysisResult.verdict === "AI"
                                             ? "Strongest suspicious segment"
-                                            : "No suspicious segment detected"}
+                                            : suspiciousRegions.length > 0
+                                                ? "Strongest suspicious segment"
+                                                : "No suspicious segment detected"}
                                     </span>
 
                                 </div>
@@ -1039,11 +1067,11 @@ function AudioAnalyzer() {
                                 <div>
 
                                     <strong>
-
                                         {analysisResult.verdict === "AI"
                                             ? "Synthetic speech detected"
-                                            : "Voice appears genuine"}
-
+                                            : suspiciousRegions.length > 0
+                                                ? "Suspicious segment detected"
+                                                : "Voice appears genuine"}
                                     </strong>
 
                                     <p>
@@ -1056,18 +1084,20 @@ function AudioAnalyzer() {
                                                         1
                                                     )}s, reaching a peak AI score of ${strongestRegion.probability.toFixed(
                                                         1
-                                                    )}%. This exceeded the ${analysisResult.threshold}% detection threshold.`
+                                                    )}%. The overall average AI probability was ${analysisResult.ai_probability}%, exceeding the ${analysisResult.threshold}% detection threshold.`
                                                     : `VIGIL detected suspicious synthetic speech between ${strongestRegion.start.toFixed(
                                                         1
                                                     )}s and ${strongestRegion.end.toFixed(
                                                         1
-                                                    )}s. This exceeded the detection threshold.`
+                                                    )}s.`
+                                                : `VIGIL detected synthetic speech based on the overall average AI probability.`
+                                            : suspiciousRegions.length > 0
+                                                ? isConfidenceVisible()
+                                                    ? `The audio was classified as genuine overall, but ${suspiciousRegions.length === 1 ? "a suspicious segment was" : "suspicious segments were"} detected above the ${analysisResult.threshold}% threshold. The overall average AI probability was ${analysisResult.ai_probability}%.`
+                                                    : `The audio was classified as genuine overall, but suspicious segment${suspiciousRegions.length === 1 ? "" : "s"} were detected above the detection threshold.`
                                                 : isConfidenceVisible()
-                                                    ? `VIGIL detected a suspicious segment with a peak AI score of ${analysisResult.maximum_ai_probability}%, exceeding the ${analysisResult.threshold}% detection threshold.`
-                                                    : `VIGIL detected a suspicious segment exceeding the detection threshold.`
-                                            : isConfidenceVisible()
-                                                ? `No analyzed segment exceeded the ${analysisResult.threshold}% detection threshold. The strongest AI score was ${analysisResult.maximum_ai_probability}%.`
-                                                : `No analyzed segment exceeded the detection threshold.`}
+                                                    ? `No analyzed segment exceeded the ${analysisResult.threshold}% detection threshold. The strongest AI score was ${analysisResult.maximum_ai_probability}%.`
+                                                    : `No analyzed segment exceeded the detection threshold.`}
                                     </p>
 
                                 </div>
@@ -1109,7 +1139,7 @@ function AudioAnalyzer() {
                                     <div>
                                         <span>Aggregation method</span>
                                         <strong>
-                                            Maximum window probability
+                                            Average window probability
                                         </strong>
                                     </div>
 

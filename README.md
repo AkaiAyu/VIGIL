@@ -74,7 +74,9 @@ Audio is processed in approximately 4-second windows.
 ```text
 Microphone
      ↓
-Browser MediaRecorder
+Browser AudioWorklet
+     ↓
+Float32 PCM
      ↓
 4-second Audio Window
      ↓
@@ -131,7 +133,7 @@ The VoIP system uses:
 
 - WebRTC for peer-to-peer audio
 - WebSocket for signaling
-- Browser MediaRecorder for audio capture
+- AudioWorklet for remote PCM audio capture
 - The same VIGIL detection pipeline used by the other input modes
 
 The monitor can:
@@ -148,6 +150,18 @@ The monitor can:
 ---
 
 # 🧠 Detection Pipeline
+
+### Decision Logic
+
+Each approximately 4-second speech window produces an AI probability.
+
+The final recording/session verdict is based on the **average AI probability across analyzed speech windows**.
+
+The highest individual window probability is retained separately as **peak AI probability** for forensic/timeline analysis.
+
+Current threshold:
+
+**45% average AI probability**
 
 All three input modes eventually use the same core detection engine.
 
@@ -226,7 +240,8 @@ The model is downloaded automatically from Hugging Face when VIGIL initializes t
 - Lucide React
 - WaveSurfer.js
 - WebRTC
-- MediaRecorder API
+- Web Audio API
+- AudioWorklet
 
 ## Backend
 
@@ -254,6 +269,8 @@ The model is downloaded automatically from Hugging Face when VIGIL initializes t
 ```text
 VIGIL/
 │
+├── .github/
+│
 ├── .gitignore
 ├── README.md
 │
@@ -280,14 +297,16 @@ VIGIL/
 └── frontend/
     ├── src/
     │   ├── components/
-    │   │   ├── Sidebar.jsx
     │   │   ├── AudioAnalyzer.jsx
     │   │   ├── LiveDetector.jsx
+    │   │   ├── Login.jsx
+    │   │   ├── Signup.jsx
+    │   │   ├── Sidebar.jsx
     │   │   └── VoIPDetector.jsx
     │   │
     │   ├── pages/
-    │   │   ├── History.jsx
     │   │   ├── Analytics.jsx
+    │   │   ├── History.jsx
     │   │   └── Settings.jsx
     │   │
     │   ├── utils/
@@ -295,7 +314,8 @@ VIGIL/
     │   │
     │   ├── App.jsx
     │   ├── index.css
-    │   └── main.jsx
+    │   ├── main.jsx
+    │   └── pcm-recorder-worklet.js
     │
     ├── index.html
     ├── package.json
@@ -603,19 +623,24 @@ The configured **45% threshold** is part of the current project configuration an
 
 # 🧪 Evaluation
 
-During development, the configured threshold produced **100% accuracy on a specific 38-sample evaluation set**.
+VIGIL was evaluated during development using both a local test set and samples from an external deepfake-audio dataset.
 
-This result should **not** be interpreted as 100% accuracy against real-world voice cloning attacks.
+On the local 38-sample evaluation set:
 
-A broader evaluation would require a larger and more diverse dataset containing:
+- 19 AI-generated samples
+- 19 genuine samples
+- 17/19 AI samples detected
+- 19/19 genuine samples correctly classified
+- 0 false positives
+- 2 false negatives
+- Accuracy: 94.74%
+- Precision: 100%
+- Recall: 89.47%
+- F1 Score: 94.44%
 
-- Multiple speakers
-- Multiple voice-cloning systems
-- Different recording environments
-- Different codecs
-- Background noise
-- Different languages and accents
-- Real telephone/VoIP conditions
+Additional testing on external samples produced results in a similar range, but performance varied across samples, voice-generation systems, and recording conditions.
+
+These results are development evaluations and should not be interpreted as universal real-world detection accuracy.
 
 ---
 
@@ -630,6 +655,7 @@ The current implementation has several limitations:
 - Detection performance depends on audio quality and attack characteristics
 - Current threshold is development-configured rather than universally optimized
 - The current WebRTC signaling implementation is intended for the VIGIL demonstration environment
+- Login and signup are currently local/demo authentication and are not intended for production security
 
 ---
 

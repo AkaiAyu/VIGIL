@@ -31,13 +31,13 @@ function Analytics() {
         // Refresh analytics if another VIGIL page
         // changes localStorage.
         window.addEventListener(
-            "storage",
+            "vigil-history-updated",
             loadHistory
         );
 
         return () => {
             window.removeEventListener(
-                "storage",
+                "vigil-history-updated",
                 loadHistory
             );
         };
@@ -271,7 +271,7 @@ function Analytics() {
                     <div>
 
                         <div className="stat-label">
-                            DETECTION RATE
+                            AI DETECTION SHARE
                         </div>
 
                         <div className="stat-value">
@@ -672,11 +672,10 @@ function Analytics() {
                                     >
 
                                         <div
-                                            className={`recent-analysis-icon ${
-                                                isAI
-                                                    ? "recent-ai"
-                                                    : "recent-genuine"
-                                            }`}
+                                            className={`recent-analysis-icon ${isAI
+                                                ? "recent-ai"
+                                                : "recent-genuine"
+                                                }`}
                                         >
 
                                             {isAI ? (

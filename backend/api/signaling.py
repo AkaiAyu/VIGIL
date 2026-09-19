@@ -39,13 +39,6 @@ class ConnectionManager:
         if not self.rooms[room_id]:
             del self.rooms[room_id]
 
-    async def send_to(
-        self,
-        websocket: WebSocket,
-        message: dict
-    ):
-        await websocket.send_json(message)
-
     async def broadcast(
         self,
         message: dict,

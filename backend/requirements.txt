@@ -3,10 +3,13 @@ uvicorn[standard]
 python-multipart
 
 torch
+torchaudio
+
 silero-vad
 
 huggingface-hub
 transformers
+accelerate
 
 librosa
 numpy

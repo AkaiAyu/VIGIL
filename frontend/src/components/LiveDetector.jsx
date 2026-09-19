@@ -23,7 +23,8 @@ function LiveDetector() {
     const [voiceStatus, setVoiceStatus] = useState("standby");
 
     const streamRef = useRef(null);
-    const mediaRecorderRef = useRef(null);
+
+    const pcmWorkletRef = useRef(null);
 
     const audioContextRef = useRef(null);
     const analyserRef = useRef(null);
@@ -38,9 +39,6 @@ function LiveDetector() {
     const sessionSavedRef = useRef(false);
     const sessionFinalizeTimerRef = useRef(null);
     const finalizingSessionRef = useRef(false);
-
-    // Timer for each 4-second recording window
-    const windowTimerRef = useRef(null);
 
     // Prevent starting another recording after Stop
     const recordingActiveRef = useRef(false);
@@ -78,11 +76,16 @@ function LiveDetector() {
                 await navigator.mediaDevices.getUserMedia({
                     audio: {
                         channelCount: 1,
-                        echoCancellation: true,
-                        noiseSuppression: true,
-                        autoGainControl: true,
+                        echoCancellation: false,
+                        noiseSuppression: false,
+                        autoGainControl: false,
                     },
                 });
+
+            const audioTrack = stream.getAudioTracks()[0];
+
+            console.log("VIGIL MIC SETTINGS:", audioTrack.getSettings());
+            console.log("VIGIL MIC CAPABILITIES:", audioTrack.getCapabilities());
 
             streamRef.current = stream;
             recordingActiveRef.current = true;
@@ -111,8 +114,8 @@ function LiveDetector() {
 
             setIsRecording(true);
 
-            // Start first 4-second window
-            startNewAudioWindow(stream);
+            // Start raw PCM capture through AudioWorklet
+            await startPCMRecording(stream);
 
             console.log(
                 "Live microphone recording started."
@@ -129,153 +132,191 @@ function LiveDetector() {
         }
     };
 
-    // --------------------------------------------------
-    // Create one COMPLETE 4-second audio file
-    // --------------------------------------------------
 
-    const startNewAudioWindow = (stream) => {
-        if (!recordingActiveRef.current) {
-            return;
-        }
+    const float32ToWavBlob = (
+        samples,
+        sampleRate
+    ) => {
+        const buffer = new ArrayBuffer(
+            44 + samples.length * 2
+        );
 
-        const windowNumber =
-            windowCounterRef.current++;
+        const view = new DataView(buffer);
 
-        const windowStart =
-            (Date.now() - sessionStartRef.current) / 1000;
-
-        const windowEnd =
-            windowStart + 4;
-
-        let mimeType = "";
-
-        if (
-            MediaRecorder.isTypeSupported(
-                "audio/webm;codecs=opus"
-            )
-        ) {
-            mimeType = "audio/webm;codecs=opus";
-        } else if (
-            MediaRecorder.isTypeSupported(
-                "audio/webm"
-            )
-        ) {
-            mimeType = "audio/webm";
-        }
-
-        let recorder;
-
-        try {
-            recorder = mimeType
-                ? new MediaRecorder(stream, {
-                    mimeType,
-                })
-                : new MediaRecorder(stream);
-        } catch (err) {
-            console.error(
-                "Could not create MediaRecorder:",
-                err
-            );
-
-            setError(
-                "Your browser does not support the required audio recorder."
-            );
-
-            return;
-        }
-
-        mediaRecorderRef.current = recorder;
-
-        const chunks = [];
-
-        // ------------------------------------------------
-        // Collect this window's audio
-        // ------------------------------------------------
-
-        recorder.ondataavailable = (event) => {
-            if (
-                event.data &&
-                event.data.size > 0
-            ) {
-                chunks.push(event.data);
-            }
-        };
-
-        // ------------------------------------------------
-        // When this 4-second recorder stops
-        // ------------------------------------------------
-
-        recorder.onstop = () => {
-            const blob = new Blob(chunks, {
-                type:
-                    recorder.mimeType ||
-                    "audio/webm",
-            });
-
-            console.log(
-                "Completed audio window:",
-                Math.round(
-                    blob.size / 1024
-                ),
-                "KB"
-            );
-
-            // Put complete file into analysis queue
-            analysisQueueRef.current.push({
-                blob,
-                windowNumber,
-                windowStart,
-                windowEnd,
-            });
-
-            processAnalysisQueue();
-
-            // Immediately start the next window
-            if (
-                recordingActiveRef.current &&
-                streamRef.current
-            ) {
-                startNewAudioWindow(
-                    streamRef.current
+        const writeString = (offset, string) => {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(
+                    offset + i,
+                    string.charCodeAt(i)
                 );
             }
         };
 
-        recorder.onerror = (event) => {
-            console.error(
-                "MediaRecorder error:",
-                event
-            );
+        writeString(0, "RIFF");
 
-            setError(
-                "The microphone recorder encountered an error."
-            );
-        };
-
-        // ------------------------------------------------
-        // Start recording this window
-        // ------------------------------------------------
-
-        recorder.start();
-
-        console.log(
-            "Started new 4-second audio window."
+        view.setUint32(
+            4,
+            36 + samples.length * 2,
+            true
         );
 
-        // ------------------------------------------------
-        // Stop THIS recorder after 4 seconds
-        // ------------------------------------------------
+        writeString(8, "WAVE");
+        writeString(12, "fmt ");
 
-        windowTimerRef.current =
-            setTimeout(() => {
-                if (
-                    recorder &&
-                    recorder.state === "recording"
-                ) {
-                    recorder.stop();
-                }
-            }, 4000);
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, 1, true);
+
+        view.setUint32(
+            24,
+            sampleRate,
+            true
+        );
+
+        view.setUint32(
+            28,
+            sampleRate * 2,
+            true
+        );
+
+        view.setUint16(32, 2, true);
+        view.setUint16(34, 16, true);
+
+        writeString(36, "data");
+
+        view.setUint32(
+            40,
+            samples.length * 2,
+            true
+        );
+
+        let offset = 44;
+
+        for (let i = 0; i < samples.length; i++) {
+            const sample = Math.max(
+                -1,
+                Math.min(1, samples[i])
+            );
+
+            const value =
+                sample < 0
+                    ? sample * 0x8000
+                    : sample * 0x7fff;
+
+            view.setInt16(
+                offset,
+                value,
+                true
+            );
+
+            offset += 2;
+        }
+
+        return new Blob(
+            [view],
+            { type: "audio/wav" }
+        );
     };
+
+    const startPCMRecording = async (stream) => {
+        const audioContext =
+            audioContextRef.current;
+
+        if (!audioContext) {
+            throw new Error(
+                "AudioContext is not available."
+            );
+        }
+
+        await audioContext.audioWorklet.addModule(
+            "/src/pcm-recorder-worklet.js"
+        );
+
+        const source =
+            audioContext.createMediaStreamSource(
+                stream
+            );
+
+        const worklet =
+            new AudioWorkletNode(
+                audioContext,
+                "pcm-recorder-processor"
+            );
+
+        const silentGain =
+            audioContext.createGain();
+
+        silentGain.gain.value = 0;
+
+        source.connect(worklet);
+        worklet.connect(silentGain);
+        silentGain.connect(
+            audioContext.destination
+        );
+
+        pcmWorkletRef.current = worklet;
+
+        worklet.port.onmessage = (event) => {
+            if (
+                !event.data ||
+                event.data.type !== "audio"
+            ) {
+                return;
+            }
+
+            const samples =
+                new Float32Array(
+                    event.data.samples
+                );
+
+            const sampleRate =
+                event.data.sampleRate;
+
+            console.log(
+                "PCM WINDOW RECEIVED:",
+                {
+                    samples: samples.length,
+                    sampleRate,
+                    duration:
+                        samples.length /
+                        sampleRate,
+                }
+            );
+
+            const wavBlob =
+                float32ToWavBlob(
+                    samples,
+                    sampleRate
+                );
+
+            console.log(
+                "PCM WAV CREATED:",
+                Math.round(
+                    wavBlob.size / 1024
+                ),
+                "KB"
+            );
+
+            analysisQueueRef.current.push({
+                blob: wavBlob,
+                windowNumber:
+                    windowCounterRef.current++,
+                windowStart:
+                    (Date.now() -
+                        sessionStartRef.current) /
+                    1000,
+                windowEnd:
+                    (Date.now() -
+                        sessionStartRef.current) /
+                    1000 +
+                    samples.length /
+                    sampleRate,
+            });
+
+            processAnalysisQueue();
+        };
+    };
+
 
     // --------------------------------------------------
     // Process audio windows sequentially
@@ -336,10 +377,15 @@ function LiveDetector() {
 
             const formData = new FormData();
 
+            const fileExtension =
+                audioBlob.type === "audio/wav"
+                    ? "wav"
+                    : "webm";
+
             formData.append(
                 "file",
                 audioBlob,
-                "live_audio.webm"
+                `live_audio.${fileExtension}`
             );
 
             console.log(
@@ -520,23 +566,106 @@ function LiveDetector() {
             return;
         }
 
-        const aiResults = results.filter(
-            (result) => result.status === "AI"
+        // --------------------------------------------------
+        // Separate speech windows from silence.
+        // Silence does NOT participate in the AI probability
+        // calculation.
+        // --------------------------------------------------
+
+        const speechResults = results.filter(
+            (result) =>
+                result.status === "AI" ||
+                result.status === "GENUINE"
         );
 
-        const genuineResults = results.filter(
-            (result) => result.status === "GENUINE"
-        );
+        if (speechResults.length === 0) {
+            return;
+        }
 
-        const isAI = aiResults.length > 0;
+        // --------------------------------------------------
+        // Window counts
+        // --------------------------------------------------
 
-        const strongestResult = results.reduce(
-            (strongest, current) =>
-                current.aiProbability >
-                    strongest.aiProbability
-                    ? current
-                    : strongest
-        );
+        const totalWindows =
+            windowCounterRef.current;
+
+        const speechWindows =
+            speechResults.length;
+
+        const aiWindows =
+            speechResults.filter(
+                (result) => result.status === "AI"
+            ).length;
+
+        const genuineWindows =
+            speechResults.filter(
+                (result) => result.status === "GENUINE"
+            ).length;
+
+        const silenceWindows =
+            Math.max(
+                0,
+                totalWindows - speechWindows
+            );
+
+        // --------------------------------------------------
+        // SESSION-LEVEL AI PROBABILITY
+        //
+        // Average the AI probability of every speech window.
+        // One extreme window should NOT decide the entire
+        // session.
+        // --------------------------------------------------
+
+        const averageAiProbability =
+            speechResults.reduce(
+                (sum, result) =>
+                    sum +
+                    Number(
+                        result.aiProbabilityAverage || 0
+                    ),
+                0
+            ) / speechResults.length;
+
+        const averageGenuineProbability =
+            100 - averageAiProbability;
+
+        // --------------------------------------------------
+        // HIGHEST SINGLE-WINDOW AI SCORE
+        //
+        // This is kept only as forensic information.
+        // It does NOT decide the session verdict.
+        // --------------------------------------------------
+
+        const peakAiProbability =
+            Math.max(
+                ...speechResults.map(
+                    (result) =>
+                        Number(
+                            result.aiProbability || 0
+                        )
+                )
+            );
+
+        // --------------------------------------------------
+        // FINAL SESSION VERDICT
+        // --------------------------------------------------
+
+        const AI_THRESHOLD = 45;
+
+        const isAI =
+            averageAiProbability >= AI_THRESHOLD;
+
+        // --------------------------------------------------
+        // SESSION CONFIDENCE
+        // --------------------------------------------------
+
+        const sessionConfidence = isAI
+            ? averageAiProbability
+            : averageGenuineProbability;
+
+        // --------------------------------------------------
+        // SESSION DURATION
+        // --------------------------------------------------
 
         const duration =
             sessionStartRef.current
@@ -545,42 +674,96 @@ function LiveDetector() {
                 1000
                 : 0;
 
+        // --------------------------------------------------
+        // SAVE TO HISTORY
+        // --------------------------------------------------
+
         if (isHistoryAutoSaveEnabled()) {
 
             saveHistory({
-                source: "Live Voice",
-                verdict: isAI ? "AI" : "GENUINE",
-                confidence: Number(
-                    strongestResult.confidence ||
-                    strongestResult.aiProbability ||
-                    0
-                ),
-                peakAi: Number(
-                    strongestResult.aiProbability ||
-                    0
-                ),
-                averageAi: Number(
-                    sessionResultsRef.current.reduce(
-                        (sum, result) =>
-                            sum + Number(result.aiProbabilityAverage || 0),
-                        0
-                    ) / sessionResultsRef.current.length
-                ),
-                genuineProbability: Number(
-                    strongestResult.genuineProbability ||
-                    0
-                ),
-                duration: Number(duration.toFixed(1)),
-                windowsAnalyzed: windowCounterRef.current,
-                model: strongestResult.model || "DF-Arena 1B",
-            });
 
+                source: "Live Voice",
+
+                // Final session verdict
+                verdict: isAI
+                    ? "AI"
+                    : "GENUINE",
+
+                // Aggregate session confidence
+                confidence:
+                    Number(
+                        sessionConfidence.toFixed(2)
+                    ),
+
+                // Aggregate probabilities
+                averageAi:
+                    Number(
+                        averageAiProbability.toFixed(2)
+                    ),
+
+                genuineProbability:
+                    Number(
+                        averageGenuineProbability.toFixed(2)
+                    ),
+
+                // Highest individual window score
+                // (for forensic reference only)
+                peakAi:
+                    Number(
+                        peakAiProbability.toFixed(2)
+                    ),
+
+                // Window statistics
+                windowsAnalyzed:
+                    totalWindows,
+
+                speechWindows:
+                    speechWindows,
+
+                aiWindows:
+                    aiWindows,
+
+                genuineWindows:
+                    genuineWindows,
+
+                silenceWindows:
+                    silenceWindows,
+
+                // Threshold used for the session decision
+                threshold:
+                    AI_THRESHOLD,
+
+                duration:
+                    Number(
+                        duration.toFixed(1)
+                    ),
+
+                model:
+                    speechResults[0]?.model ||
+                    "DF-Arena 1B",
+            });
         }
 
         sessionSavedRef.current = true;
 
         console.log(
-            "VIGIL live session saved to history."
+            "VIGIL live session saved to history:",
+            {
+                verdict: isAI
+                    ? "AI"
+                    : "GENUINE",
+
+                averageAiProbability,
+                averageGenuineProbability,
+
+                peakAiProbability,
+
+                totalWindows,
+                speechWindows,
+                aiWindows,
+                genuineWindows,
+                silenceWindows,
+            }
         );
     };
 
@@ -591,25 +774,21 @@ function LiveDetector() {
         // Prevent another window from starting
         recordingActiveRef.current = false;
 
-        // Stop the current window timer
-        if (windowTimerRef.current) {
-            clearTimeout(windowTimerRef.current);
-            windowTimerRef.current = null;
-        }
-
-        // Stop the current recorder.
-        // Its onstop callback will push the final window
-        // into the analysis queue.
-        const recorder = mediaRecorderRef.current;
-
-        if (recorder && recorder.state !== "inactive") {
-            recorder.stop();
-        }
-
         // Stop microphone activity animation
         if (animationRef.current) {
             cancelAnimationFrame(animationRef.current);
             animationRef.current = null;
+        }
+
+
+        // Stop PCM AudioWorklet
+        if (pcmWorkletRef.current) {
+            pcmWorkletRef.current.port.postMessage(
+                "reset"
+            );
+
+            pcmWorkletRef.current.disconnect();
+            pcmWorkletRef.current = null;
         }
 
         // Stop microphone tracks
@@ -627,10 +806,6 @@ function LiveDetector() {
             audioContextRef.current = null;
         }
 
-        // IMPORTANT:
-        // Do NOT immediately clear mediaRecorderRef here.
-        // The recorder's onstop callback still needs to finish.
-
         analyserRef.current = null;
 
         setAudioLevel(0);
@@ -642,18 +817,11 @@ function LiveDetector() {
                 return;
             }
 
-            const recorderStillActive =
-                mediaRecorderRef.current &&
-                mediaRecorderRef.current.state !== "inactive";
-
             const queueStillProcessing =
                 processingQueueRef.current ||
                 analysisQueueRef.current.length > 0;
 
-            if (
-                recorderStillActive ||
-                queueStillProcessing
-            ) {
+            if (queueStillProcessing) {
                 sessionFinalizeTimerRef.current =
                     setTimeout(
                         waitForFinalAnalysis,
@@ -663,11 +831,8 @@ function LiveDetector() {
                 return;
             }
 
-            // The final recorder has stopped and
-            // all queued windows have been analyzed.
             finalizeSessionHistory();
 
-            mediaRecorderRef.current = null;
         };
 
         waitForFinalAnalysis();
@@ -688,20 +853,6 @@ function LiveDetector() {
 
             recordingActiveRef.current =
                 false;
-
-            if (windowTimerRef.current) {
-                clearTimeout(
-                    windowTimerRef.current
-                );
-            }
-
-            if (
-                mediaRecorderRef.current &&
-                mediaRecorderRef.current.state !==
-                "inactive"
-            ) {
-                mediaRecorderRef.current.stop();
-            }
 
             if (streamRef.current) {
                 streamRef.current
