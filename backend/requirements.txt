@@ -1,15 +1,57 @@
-fastapi
-uvicorn[standard]
-python-multipart
+# =========================================================
+# VIGIL BACKEND
+# Python 3.11
+# =========================================================
 
-torch
-torchaudio
+# -------------------------
+# Web API
+# -------------------------
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+python-multipart==0.0.32
 
-silero-vad
+# -------------------------
+# Environment / Configuration
+# -------------------------
+python-dotenv==1.2.3
 
-huggingface-hub
-transformers
-accelerate
+# -------------------------
+# PyTorch / Audio ML
+# -------------------------
+torch==2.11.0+cu128
+torchaudio==2.11.0+cu128
 
-librosa
-numpy
+# -------------------------
+# Voice Activity Detection
+# -------------------------
+silero-vad==6.2.1
+
+# -------------------------
+# Hugging Face / DF-Arena
+# -------------------------
+huggingface-hub==1.31.0
+transformers==5.17.0
+accelerate==1.15.0
+
+# -------------------------
+# Audio Processing
+# -------------------------
+librosa==0.11.0
+numpy==2.4.6
+scipy==1.17.1
+
+# -------------------------
+# CallShield — Speech-to-Text
+# -------------------------
+deepgram-sdk==7.9.0
+
+# -------------------------
+# CallShield — AI Analysis
+# -------------------------
+google-genai==2.24.0
+groq==1.7.0
+
+# -------------------------
+# Developer / Microphone Test
+# -------------------------
+sounddevice==0.5.6

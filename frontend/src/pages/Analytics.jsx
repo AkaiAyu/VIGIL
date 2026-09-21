@@ -113,6 +113,84 @@ function Analytics() {
                 ).length,
         };
 
+        // --------------------------------------------------
+        // CALLSHIELD ANALYTICS
+        // --------------------------------------------------
+
+        const callShieldEntries =
+            history.filter(
+                entry =>
+                    entry.callShieldRiskLevel
+            );
+
+        const callShieldCalls =
+            callShieldEntries.length;
+
+        const riskCounts = {
+            LOW: callShieldEntries.filter(
+                entry =>
+                    entry.callShieldRiskLevel ===
+                    "LOW"
+            ).length,
+
+            MEDIUM: callShieldEntries.filter(
+                entry =>
+                    entry.callShieldRiskLevel ===
+                    "MEDIUM"
+            ).length,
+
+            HIGH: callShieldEntries.filter(
+                entry =>
+                    entry.callShieldRiskLevel ===
+                    "HIGH"
+            ).length,
+
+            CRITICAL: callShieldEntries.filter(
+                entry =>
+                    entry.callShieldRiskLevel ===
+                    "CRITICAL"
+            ).length,
+        };
+
+        const riskScores =
+            callShieldEntries
+                .map(entry =>
+                    Number(
+                        entry.callShieldRiskScore
+                    )
+                )
+                .filter(
+                    value =>
+                        Number.isFinite(value)
+                );
+
+        const averageRiskScore =
+            riskScores.length > 0
+                ? riskScores.reduce(
+                    (sum, value) =>
+                        sum + value,
+                    0
+                ) / riskScores.length
+                : 0;
+
+        const totalThreats =
+            callShieldEntries.reduce(
+                (sum, entry) =>
+                    sum +
+                    (
+                        Array.isArray(
+                            entry.callShieldReasons
+                        )
+                            ? entry.callShieldReasons.length
+                            : 0
+                    ),
+                0
+            );
+
+        const seriousThreats =
+            riskCounts.HIGH +
+            riskCounts.CRITICAL;
+
 
         return {
             total,
@@ -121,6 +199,12 @@ function Analytics() {
             detectionRate,
             averageConfidence,
             sourceCounts,
+
+            callShieldCalls,
+            riskCounts,
+            averageRiskScore,
+            totalThreats,
+            seriousThreats,
         };
 
     }, [history]);
@@ -282,6 +366,82 @@ function Analytics() {
 
                     </div>
 
+                </div>
+
+            </section>
+
+
+            {/* CALLSHIELD STATS */}
+
+            <section className="stats-grid callshield-analytics-grid">
+
+                <div className="stat-card">
+                    <div className="stat-icon">
+                        <ShieldAlert size={19} />
+                    </div>
+
+                    <div>
+                        <div className="stat-label">
+                            CALLS ANALYZED
+                        </div>
+
+                        <div className="stat-value">
+                            {analytics.callShieldCalls}
+                        </div>
+                    </div>
+                </div>
+
+
+                <div className="stat-card analytics-ai-stat">
+                    <div className="stat-icon">
+                        <AlertTriangle size={19} />
+                    </div>
+
+                    <div>
+                        <div className="stat-label">
+                            HIGH / CRITICAL
+                        </div>
+
+                        <div className="stat-value">
+                            {analytics.seriousThreats}
+                        </div>
+                    </div>
+                </div>
+
+
+                <div className="stat-card">
+                    <div className="stat-icon">
+                        <Activity size={19} />
+                    </div>
+
+                    <div>
+                        <div className="stat-label">
+                            AVG RISK SCORE
+                        </div>
+
+                        <div className="stat-value">
+                            {Math.round(
+                                analytics.averageRiskScore
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+
+                <div className="stat-card analytics-ai-stat">
+                    <div className="stat-icon">
+                        <ShieldAlert size={19} />
+                    </div>
+
+                    <div>
+                        <div className="stat-label">
+                            THREAT INDICATORS
+                        </div>
+
+                        <div className="stat-value">
+                            {analytics.totalThreats}
+                        </div>
+                    </div>
                 </div>
 
             </section>
@@ -520,6 +680,112 @@ function Analytics() {
             </section>
 
 
+            {/* CALLSHIELD RISK DISTRIBUTION */}
+
+            <section className="panel analytics-callshield-panel">
+
+                <div className="panel-header">
+
+                    <div>
+                        <div className="card-eyebrow">
+                            CALLSHIELD
+                        </div>
+
+                        <h2>
+                            Conversation Risk Distribution
+                        </h2>
+                    </div>
+
+                    <ShieldAlert size={20} />
+
+                </div>
+
+
+                {analytics.callShieldCalls === 0 ? (
+
+                    <div className="empty-threat">
+
+                        <div className="empty-shield">
+                            ✓
+                        </div>
+
+                        <h3>
+                            No CallShield data
+                        </h3>
+
+                        <p>
+                            Complete a VoIP analysis
+                            to populate conversation
+                            threat analytics.
+                        </p>
+
+                    </div>
+
+                ) : (
+
+                    <div className="callshield-risk-distribution">
+
+                        {[
+                            ["LOW", "low"],
+                            ["MEDIUM", "medium"],
+                            ["HIGH", "high"],
+                            ["CRITICAL", "critical"],
+                        ].map(
+                            ([level, className]) => {
+
+                                const count =
+                                    analytics
+                                        .riskCounts[level];
+
+                                const percentage =
+                                    analytics
+                                        .callShieldCalls > 0
+                                        ? (
+                                            count /
+                                            analytics.callShieldCalls
+                                        ) * 100
+                                        : 0;
+
+                                return (
+                                    <div
+                                        className="risk-distribution-row"
+                                        key={level}
+                                    >
+
+                                        <div
+                                            className={`risk-distribution-label ${className}`}
+                                        >
+                                            {level}
+                                        </div>
+
+                                        <div className="risk-distribution-track">
+
+                                            <div
+                                                className={`risk-distribution-fill ${className}`}
+                                                style={{
+                                                    width:
+                                                        `${percentage}%`,
+                                                }}
+                                            />
+
+                                        </div>
+
+                                        <div className="risk-distribution-count">
+                                            {count}
+                                        </div>
+
+                                    </div>
+                                );
+                            }
+                        )}
+
+                    </div>
+
+                )}
+
+            </section>
+
+
             {/* SOURCE ANALYSIS */}
 
             <section className="panel analytics-source-panel">
@@ -664,6 +930,24 @@ function Analytics() {
                                     entry.verdict ===
                                     "AI";
 
+                                const hasCallShieldRisk =
+                                    entry.source === "VoIP Monitor" &&
+                                    entry.callShieldRiskLevel;
+
+                                const callShieldRiskLevel =
+                                    hasCallShieldRisk
+                                        ? String(
+                                            entry.callShieldRiskLevel
+                                        ).toUpperCase()
+                                        : null;
+
+                                const callShieldRiskScore =
+                                    hasCallShieldRisk
+                                        ? Number(
+                                            entry.callShieldRiskScore || 0
+                                        )
+                                        : 0;
+
                                 return (
 
                                     <div
@@ -704,6 +988,20 @@ function Analytics() {
                                                     entry.source ||
                                                     "Unknown Source"
                                                 }
+
+                                                {hasCallShieldRisk && (
+                                                    <>
+                                                        {" • "}
+
+                                                        <span
+                                                            className={`recent-callshield-risk ${callShieldRiskLevel.toLowerCase()}`}
+                                                        >
+                                                            CALLSHIELD ·{" "}
+                                                            {callShieldRiskLevel} ·{" "}
+                                                            {callShieldRiskScore}
+                                                        </span>
+                                                    </>
+                                                )}
                                             </span>
 
                                         </div>

@@ -5360,3 +5360,1506 @@ button {
     margin-top: 2px;
     line-height: 1.4;
 }
+
+
+/* =========================================================
+   CALLSHIELD
+   ========================================================= */
+
+.callshield-panel {
+    margin-top: 18px;
+    padding: 20px;
+    border: 1px solid rgba(0, 210, 255, 0.18);
+    border-radius: 14px;
+    background: rgba(5, 14, 25, 0.82);
+}
+
+.callshield-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px;
+}
+
+.callshield-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: #00d9ff;
+}
+
+.callshield-title {
+    margin-top: 5px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.callshield-status {
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    border: 1px solid rgba(0, 210, 255, 0.25);
+    color: #00d9ff;
+}
+
+.callshield-status.analyzed {
+    color: #7cff9b;
+    border-color: rgba(124, 255, 155, 0.3);
+}
+
+.callshield-status.error {
+    color: #ff6262;
+    border-color: rgba(255, 98, 98, 0.3);
+}
+
+.callshield-section-label {
+    margin-bottom: 8px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: #60758d;
+}
+
+.callshield-transcript {
+    margin-bottom: 16px;
+    padding: 14px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.18);
+}
+
+.callshield-transcript-text {
+    color: #b8c8d8;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.callshield-risk {
+    padding: 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(0, 210, 255, 0.15);
+}
+
+.callshield-risk.low {
+    border-color: rgba(80, 220, 130, 0.25);
+}
+
+.callshield-risk.medium {
+    border-color: rgba(255, 190, 70, 0.35);
+}
+
+.callshield-risk.high,
+.callshield-risk.critical {
+    border-color: rgba(255, 70, 70, 0.4);
+}
+
+.callshield-risk-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.callshield-risk-level {
+    font-size: 24px;
+    font-weight: 800;
+}
+
+.callshield-risk-score {
+    font-size: 32px;
+    font-weight: 800;
+}
+
+.callshield-risk.low .callshield-risk-level,
+.callshield-risk.low .callshield-risk-score {
+    color: #7cff9b;
+}
+
+.callshield-risk.medium .callshield-risk-level,
+.callshield-risk.medium .callshield-risk-score {
+    color: #ffca63;
+}
+
+.callshield-risk.high .callshield-risk-level,
+.callshield-risk.high .callshield-risk-score,
+.callshield-risk.critical .callshield-risk-level,
+.callshield-risk.critical .callshield-risk-score {
+    color: #ff6262;
+}
+
+.callshield-reasons {
+    margin-top: 18px;
+}
+
+.callshield-reasons ul {
+    margin: 0;
+    padding-left: 18px;
+}
+
+.callshield-reasons li {
+    margin-bottom: 7px;
+    color: #b8c8d8;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.callshield-recommendation {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    color: #d5e0ea;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.callshield-empty {
+    padding: 18px;
+    text-align: center;
+    color: #60758d;
+    font-size: 11px;
+}
+
+.callshield-error {
+    padding: 14px;
+    border-radius: 9px;
+    color: #ff7474;
+    background: rgba(255, 60, 60, 0.06);
+    font-size: 11px;
+}
+
+.callshield-header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.callshield-close {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.03);
+    color: #71859b;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+
+.callshield-close:hover {
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.07);
+}
+
+.voip-result-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.voip-result-close {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.03);
+    color: #71859b;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+
+.voip-result-close:hover {
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.07);
+}
+
+/* =========================================================
+   REAL-TIME THREAT ALERT
+   ========================================================= */
+
+.threat-alert {
+    margin: 18px 0;
+    padding: 18px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 70, 70, 0.45);
+    background:
+        linear-gradient(
+            135deg,
+            rgba(80, 15, 20, 0.32),
+            rgba(20, 8, 12, 0.88)
+        );
+    box-shadow:
+        0 0 0 1px rgba(255, 70, 70, 0.05),
+        0 12px 35px rgba(0, 0, 0, 0.25);
+}
+
+.threat-alert.critical {
+    border-color: rgba(255, 60, 60, 0.65);
+    box-shadow:
+        0 0 0 1px rgba(255, 60, 60, 0.08),
+        0 0 28px rgba(255, 60, 60, 0.12),
+        0 12px 35px rgba(0, 0, 0, 0.3);
+}
+
+.threat-alert-header {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+}
+
+.threat-alert-icon {
+    width: 38px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border-radius: 10px;
+    background: rgba(255, 60, 60, 0.12);
+    border: 1px solid rgba(255, 60, 60, 0.25);
+    color: #ff6262;
+    font-size: 20px;
+    font-weight: 800;
+}
+
+.threat-alert-label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1.8px;
+    color: #ff6262;
+}
+
+.threat-alert-title {
+    margin-top: 4px;
+    font-size: 17px;
+    font-weight: 800;
+    color: #ffffff;
+}
+
+.threat-alert-close {
+    width: 28px;
+    height: 28px;
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.03);
+    color: #71859b;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.threat-alert-close:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.07);
+}
+
+.threat-alert-content {
+    margin-top: 15px;
+    padding: 12px 14px;
+    border-radius: 9px;
+    background: rgba(0, 0, 0, 0.18);
+}
+
+.threat-alert-content ul {
+    margin: 0;
+    padding-left: 18px;
+}
+
+.threat-alert-content li {
+    margin-bottom: 6px;
+    color: #d5bfc2;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.threat-alert-content li:last-child {
+    margin-bottom: 0;
+}
+
+.threat-alert-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 9px;
+    margin-top: 14px;
+}
+
+.threat-alert-dismiss,
+.threat-alert-end {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 9px 14px;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    cursor: pointer;
+}
+
+.threat-alert-dismiss {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.03);
+    color: #9aabbd;
+}
+
+.threat-alert-dismiss:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.07);
+}
+
+.threat-alert-end {
+    border: 1px solid rgba(255, 70, 70, 0.35);
+    background: rgba(255, 60, 60, 0.12);
+    color: #ff7474;
+}
+
+.threat-alert-end:hover {
+    background: rgba(255, 60, 60, 0.2);
+    color: #ff8a8a;
+}
+
+/* =========================================================
+   CALLSHIELD THREAT TIMELINE
+   ========================================================= */
+
+.callshield-timeline {
+    margin-top: 20px;
+    padding-top: 18px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.callshield-timeline-list {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 12px;
+    padding-left: 4px;
+}
+
+.callshield-timeline-list::before {
+    content: "";
+    position: absolute;
+    left: 7px;
+    top: 7px;
+    bottom: 7px;
+    width: 1px;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.callshield-timeline-item {
+    position: relative;
+    display: flex;
+    gap: 12px;
+}
+
+.callshield-timeline-marker {
+    width: 7px;
+    height: 7px;
+    flex-shrink: 0;
+    margin-top: 6px;
+    border-radius: 50%;
+    background: #60758d;
+    box-shadow: 0 0 0 3px rgba(96, 117, 141, 0.08);
+    z-index: 1;
+}
+
+.callshield-timeline-item.low
+    .callshield-timeline-marker {
+    background: #7cff9b;
+    box-shadow: 0 0 0 3px rgba(124, 255, 155, 0.08);
+}
+
+.callshield-timeline-item.medium
+    .callshield-timeline-marker {
+    background: #ffca63;
+    box-shadow: 0 0 0 3px rgba(255, 202, 99, 0.08);
+}
+
+.callshield-timeline-item.high
+    .callshield-timeline-marker,
+.callshield-timeline-item.critical
+    .callshield-timeline-marker {
+    background: #ff6262;
+    box-shadow: 0 0 0 3px rgba(255, 98, 98, 0.08);
+}
+
+.callshield-timeline-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.callshield-timeline-top {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+
+.callshield-timeline-time {
+    color: #60758d;
+    font-size: 10px;
+    font-family: monospace;
+}
+
+.callshield-timeline-risk {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+}
+
+.callshield-timeline-item.low
+    .callshield-timeline-risk {
+    color: #7cff9b;
+}
+
+.callshield-timeline-item.medium
+    .callshield-timeline-risk {
+    color: #ffca63;
+}
+
+.callshield-timeline-item.high
+    .callshield-timeline-risk,
+.callshield-timeline-item.critical
+    .callshield-timeline-risk {
+    color: #ff6262;
+}
+
+.callshield-timeline-score {
+    margin-left: auto;
+    color: #8da0b4;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.callshield-timeline-reason {
+    margin-top: 4px;
+    color: #9aabbd;
+    font-size: 11px;
+    line-height: 1.45;
+}
+
+/* =========================================================
+   POST-CALL SECURITY SUMMARY
+   ========================================================= */
+
+.call-summary-panel {
+    margin-top: 18px;
+    padding: 20px;
+    border: 1px solid rgba(0, 210, 255, 0.18);
+    border-radius: 14px;
+    background: rgba(5, 14, 25, 0.82);
+}
+
+.call-summary-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px;
+}
+
+.call-summary-label {
+    color: #00d9ff;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2px;
+}
+
+.call-summary-title {
+    margin-top: 5px;
+    font-size: 17px;
+    font-weight: 700;
+}
+
+.call-summary-ended {
+    padding: 6px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+    color: #71859b;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+
+.call-summary-grid {
+    display: grid;
+    grid-template-columns:
+        repeat(4, 1fr);
+    gap: 10px;
+}
+
+.call-summary-stat {
+    padding: 13px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 9px;
+    background: rgba(0, 0, 0, 0.16);
+}
+
+.call-summary-stat span {
+    display: block;
+    margin-bottom: 7px;
+    color: #60758d;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+}
+
+.call-summary-stat strong {
+    color: #d8e4ef;
+    font-size: 17px;
+}
+
+.call-summary-section {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.call-summary-authenticity {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.call-summary-authenticity > div {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.call-summary-authenticity strong {
+    color: #7cff9b;
+    font-size: 22px;
+}
+
+.call-summary-authenticity span {
+    color: #71859b;
+    font-size: 10px;
+}
+
+.call-summary-risk {
+    margin-top: 18px;
+    padding: 16px;
+    border: 1px solid rgba(0, 210, 255, 0.15);
+    border-radius: 11px;
+}
+
+.call-summary-risk.low {
+    border-color: rgba(80, 220, 130, 0.25);
+}
+
+.call-summary-risk.medium {
+    border-color: rgba(255, 190, 70, 0.35);
+}
+
+.call-summary-risk.high,
+.call-summary-risk.critical {
+    border-color: rgba(255, 70, 70, 0.45);
+}
+
+.call-summary-risk-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.call-summary-risk-level {
+    margin-top: 2px;
+    font-size: 24px;
+    font-weight: 800;
+}
+
+.call-summary-risk-score {
+    font-size: 32px;
+    font-weight: 800;
+}
+
+.call-summary-risk.low
+    .call-summary-risk-level,
+.call-summary-risk.low
+    .call-summary-risk-score {
+    color: #7cff9b;
+}
+
+.call-summary-risk.medium
+    .call-summary-risk-level,
+.call-summary-risk.medium
+    .call-summary-risk-score {
+    color: #ffca63;
+}
+
+.call-summary-risk.high
+    .call-summary-risk-level,
+.call-summary-risk.high
+    .call-summary-risk-score,
+.call-summary-risk.critical
+    .call-summary-risk-level,
+.call-summary-risk.critical
+    .call-summary-risk-score {
+    color: #ff6262;
+}
+
+.call-summary-reasons {
+    margin: 0;
+    padding-left: 18px;
+}
+
+.call-summary-reasons li {
+    margin-bottom: 7px;
+    color: #b8c8d8;
+    font-size: 11px;
+    line-height: 1.5;
+}
+
+.call-summary-recommendation {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    color: #d5e0ea;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+/* =========================================================
+   HISTORY — CALLSHIELD
+   ========================================================= */
+
+.history-callshield {
+    margin-top: 22px;
+    padding: 20px;
+    border: 1px solid rgba(0, 210, 255, 0.16);
+    border-radius: 12px;
+    background: rgba(3, 12, 23, 0.65);
+}
+
+.history-callshield-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 18px;
+}
+
+.history-callshield-eyebrow {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1.7px;
+    color: #00d9ff;
+}
+
+.history-callshield-title {
+    margin-top: 5px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #e7f0f8;
+}
+
+.history-callshield-risk {
+    min-width: 82px;
+    padding: 7px 12px;
+    text-align: center;
+    border-radius: 999px;
+    border: 1px solid rgba(124, 255, 155, 0.25);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    color: #7cff9b;
+}
+
+.history-callshield-risk.low {
+    color: #7cff9b;
+    border-color: rgba(124, 255, 155, 0.3);
+}
+
+.history-callshield-risk.medium {
+    color: #ffca63;
+    border-color: rgba(255, 202, 99, 0.35);
+}
+
+.history-callshield-risk.high,
+.history-callshield-risk.critical {
+    color: #ff6262;
+    border-color: rgba(255, 98, 98, 0.4);
+}
+
+.history-callshield-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.history-callshield-stat {
+    padding: 14px;
+    border-radius: 9px;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.history-callshield-stat span {
+    display: block;
+    margin-bottom: 7px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1.4px;
+    color: #60758d;
+}
+
+.history-callshield-stat strong {
+    font-size: 22px;
+    color: #dce9f5;
+}
+
+.history-callshield-risk.medium
+    ~ .history-callshield-stats strong {
+    color: #ffca63;
+}
+
+.history-callshield-reasons {
+    margin-top: 18px;
+}
+
+.history-callshield-section-title {
+    margin-bottom: 9px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: #60758d;
+}
+
+.history-callshield-reasons ul {
+    margin: 0;
+    padding-left: 18px;
+}
+
+.history-callshield-reasons li {
+    margin-bottom: 7px;
+    color: #b8c8d8;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.history-callshield-recommendation {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.history-callshield-recommendation p {
+    margin: 0;
+    color: #d5e0ea;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+/* =========================================================
+   ANALYTICS — CALLSHIELD
+   ========================================================= */
+
+.callshield-analytics-grid {
+    margin-top: 14px;
+}
+
+.analytics-callshield-panel {
+    margin-top: 18px;
+}
+
+.callshield-risk-distribution {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.risk-distribution-row {
+    display: grid;
+    grid-template-columns: 80px 1fr 35px;
+    align-items: center;
+    gap: 12px;
+}
+
+.risk-distribution-label {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 1px;
+}
+
+.risk-distribution-label.low {
+    color: #7cff9b;
+}
+
+.risk-distribution-label.medium {
+    color: #ffca63;
+}
+
+.risk-distribution-label.high,
+.risk-distribution-label.critical {
+    color: #ff6262;
+}
+
+.risk-distribution-track {
+    height: 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.risk-distribution-fill {
+    height: 100%;
+    min-width: 0;
+    border-radius: inherit;
+    transition: width 0.4s ease;
+}
+
+.risk-distribution-fill.low {
+    background: #7cff9b;
+}
+
+.risk-distribution-fill.medium {
+    background: #ffca63;
+}
+
+.risk-distribution-fill.high,
+.risk-distribution-fill.critical {
+    background: #ff6262;
+}
+
+.risk-distribution-count {
+    text-align: right;
+    color: #dce9f5;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+/* =========================================================
+   ANALYTICS — RECENT CALLSHIELD RISK
+   ========================================================= */
+
+.recent-callshield-risk {
+    font-weight: 700;
+    letter-spacing: 0.3px;
+}
+
+.recent-callshield-risk.low {
+    color: #7cff9b;
+}
+
+.recent-callshield-risk.medium {
+    color: #ffca63;
+}
+
+.recent-callshield-risk.high,
+.recent-callshield-risk.critical {
+    color: #ff6262;
+}
+
+.callshield-status.disabled {
+    color: #71859b;
+    border-color: rgba(113, 133, 155, 0.25);
+}
+
+
+/* =========================================================
+   VIGIL SECURITY COMMAND CENTER
+   ========================================================= */
+
+.vigil-dashboard-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.vigil-dashboard-stat {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 20px;
+    border: 1px solid rgba(120, 160, 200, 0.12);
+    border-radius: 14px;
+    background: rgba(10, 20, 32, 0.72);
+}
+
+.vigil-stat-icon {
+    width: 42px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 11px;
+    background: rgba(46, 173, 255, 0.09);
+    color: #4db8ff;
+    font-size: 19px;
+}
+
+.vigil-dashboard-stat.threat .vigil-stat-icon {
+    background: rgba(255, 76, 76, 0.09);
+    color: #ff6262;
+}
+
+.vigil-dashboard-stat span {
+    display: block;
+    color: #71859b;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+}
+
+.vigil-dashboard-stat strong {
+    display: block;
+    margin-top: 4px;
+    color: #edf6ff;
+    font-size: 25px;
+    line-height: 1;
+}
+
+.vigil-dashboard-stat small {
+    display: block;
+    margin-top: 6px;
+    color: #506277;
+    font-size: 10px;
+}
+
+.vigil-security-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    margin-bottom: 24px;
+}
+
+.vigil-security-card,
+.vigil-activity-card {
+    border: 1px solid rgba(120, 160, 200, 0.12);
+    border-radius: 16px;
+    background: rgba(10, 20, 32, 0.72);
+    padding: 22px;
+}
+
+.vigil-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.vigil-card-header h2 {
+    margin-top: 5px;
+}
+
+.vigil-engine-badge {
+    padding: 5px 9px;
+    border: 1px solid rgba(60, 220, 150, 0.2);
+    border-radius: 6px;
+    color: #55d99c;
+    background: rgba(60, 220, 150, 0.07);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+}
+
+.vigil-security-main-value {
+    margin-top: 26px;
+    color: #edf6ff;
+    font-size: 42px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.vigil-security-label {
+    margin-top: 7px;
+    color: #71859b;
+    font-size: 11px;
+}
+
+.vigil-progress,
+.vigil-risk-bar {
+    height: 6px;
+    margin-top: 18px;
+    overflow: hidden;
+    border-radius: 99px;
+    background: rgba(120, 160, 200, 0.1);
+}
+
+.vigil-progress div {
+    height: 100%;
+    border-radius: inherit;
+    background: #45d39a;
+}
+
+.vigil-risk-bar div {
+    height: 100%;
+    border-radius: inherit;
+    background: #e7b44d;
+}
+
+.vigil-risk-bar div.danger {
+    background: #ff555f;
+}
+
+.vigil-security-details,
+.vigil-callshield-meta {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.vigil-callshield-meta {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.vigil-security-details div,
+.vigil-callshield-meta div {
+    padding: 11px;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.025);
+}
+
+.vigil-security-details span,
+.vigil-callshield-meta span {
+    display: block;
+    color: #62768c;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.vigil-security-details strong,
+.vigil-callshield-meta strong {
+    display: block;
+    margin-top: 5px;
+    color: #dce8f5;
+    font-size: 16px;
+}
+
+.success-text {
+    color: #55d99c !important;
+}
+
+.danger-text {
+    color: #ff6262 !important;
+}
+
+.vigil-latest-result {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(120, 160, 200, 0.09);
+}
+
+.vigil-latest-result span {
+    color: #62768c;
+    font-size: 10px;
+}
+
+.vigil-latest-result strong {
+    color: #dce8f5;
+    font-size: 10px;
+}
+
+.vigil-latest-result small {
+    margin-left: auto;
+    color: #506277;
+    font-size: 9px;
+}
+
+.vigil-risk-badge {
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    border: 1px solid rgba(120, 160, 200, 0.15);
+    color: #71859b;
+}
+
+.vigil-risk-badge.low {
+    color: #55d99c;
+    border-color: rgba(60, 220, 150, 0.25);
+    background: rgba(60, 220, 150, 0.07);
+}
+
+.vigil-risk-badge.medium {
+    color: #e7b44d;
+    border-color: rgba(231, 180, 77, 0.25);
+    background: rgba(231, 180, 77, 0.07);
+}
+
+.vigil-risk-badge.high,
+.vigil-risk-badge.critical {
+    color: #ff6262;
+    border-color: rgba(255, 80, 90, 0.25);
+    background: rgba(255, 80, 90, 0.07);
+}
+
+.vigil-risk-score {
+    margin-top: 25px;
+}
+
+.vigil-risk-score strong {
+    color: #ff6262;
+    font-size: 42px;
+    line-height: 1;
+}
+
+.vigil-risk-score span {
+    margin-left: 5px;
+    color: #62768c;
+    font-size: 13px;
+}
+
+.vigil-dashboard-threat {
+    margin-top: 18px;
+    padding: 12px 14px;
+    border-left: 2px solid #ff555f;
+    border-radius: 0 8px 8px 0;
+    background: rgba(255, 80, 90, 0.05);
+}
+
+.vigil-dashboard-threat span {
+    color: #ff6262;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+}
+
+.vigil-dashboard-threat p {
+    margin-top: 5px;
+    color: #b9c9d9;
+    font-size: 11px;
+    line-height: 1.5;
+}
+
+/* CallShield LOW */
+
+.vigil-dashboard-threat.low {
+    border-left-color: #55d99c;
+    background: rgba(60, 220, 150, 0.05);
+}
+
+.vigil-dashboard-threat.low span {
+    color: #55d99c;
+}
+
+/* CallShield MEDIUM */
+
+.vigil-dashboard-threat.medium {
+    border-left-color: #e7b44d;
+    background: rgba(231, 180, 77, 0.05);
+}
+
+.vigil-dashboard-threat.medium span {
+    color: #e7b44d;
+}
+
+.vigil-no-callshield {
+    padding: 38px 10px 20px;
+    text-align: center;
+}
+
+.vigil-no-callshield > div {
+    width: 42px;
+    height: 42px;
+    margin: 0 auto 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(60, 220, 150, 0.08);
+    color: #55d99c;
+}
+
+.vigil-no-callshield h3 {
+    color: #c9d8e7;
+    font-size: 13px;
+}
+
+.vigil-no-callshield p {
+    max-width: 340px;
+    margin: 7px auto 0;
+    color: #62768c;
+    font-size: 10px;
+    line-height: 1.5;
+}
+
+.vigil-activity-card {
+    margin-top: 24px;
+}
+
+.vigil-activity-list {
+    margin-top: 15px;
+}
+
+.vigil-activity-item {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    padding: 13px 0;
+    border-top: 1px solid rgba(120, 160, 200, 0.08);
+}
+
+.vigil-activity-icon {
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9px;
+    font-size: 13px;
+    background: rgba(60, 220, 150, 0.07);
+    color: #55d99c;
+}
+
+.vigil-activity-icon.threat {
+    background: rgba(255, 80, 90, 0.08);
+    color: #ff6262;
+}
+
+.vigil-activity-icon.call {
+    background: rgba(77, 184, 255, 0.08);
+    color: #4db8ff;
+}
+
+.vigil-activity-info {
+    min-width: 0;
+    flex: 1;
+}
+
+.vigil-activity-info strong {
+    display: block;
+    color: #dce8f5;
+    font-size: 11px;
+}
+
+.vigil-activity-info span {
+    display: block;
+    margin-top: 3px;
+    color: #506277;
+    font-size: 9px;
+}
+
+.vigil-activity-result {
+    color: #aebed0;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.vigil-empty-activity {
+    padding: 32px;
+    text-align: center;
+    color: #62768c;
+}
+
+.vigil-empty-activity > div {
+    margin-bottom: 8px;
+    color: #55d99c;
+}
+
+/* Responsive */
+
+@media (max-width: 1000px) {
+    .vigil-dashboard-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .vigil-security-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 600px) {
+    .vigil-dashboard-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .vigil-security-details {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* =========================================================
+   VIGIL DASHBOARD - TABLET / MOBILE
+   ========================================================= */
+
+@media (max-width: 900px) {
+    .vigil-dashboard-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .vigil-security-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .vigil-security-card {
+        min-width: 0;
+    }
+}
+
+@media (max-width: 640px) {
+    .vigil-dashboard-stats {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .vigil-dashboard-stat {
+        padding: 16px;
+    }
+
+    .vigil-security-card,
+    .vigil-activity-card {
+        padding: 17px;
+        border-radius: 13px;
+    }
+
+    .vigil-security-main-value,
+    .vigil-risk-score strong {
+        font-size: 34px;
+    }
+
+    .vigil-security-details,
+    .vigil-callshield-meta {
+        grid-template-columns: 1fr;
+    }
+
+    .vigil-latest-result {
+        flex-wrap: wrap;
+    }
+
+    .vigil-latest-result small {
+        width: 100%;
+        margin-left: 0;
+    }
+
+    .vigil-activity-item {
+        gap: 10px;
+    }
+
+    .vigil-activity-result {
+        font-size: 10px;
+    }
+
+    .vigil-activity-info strong {
+        font-size: 10px;
+    }
+}
+
+
+.system-pill.backend-offline {
+    color: #ff6262;
+    border-color: rgba(255, 80, 90, 0.25);
+    background: rgba(255, 80, 90, 0.07);
+}
+
+.system-pill.backend-offline .status-dot {
+    background: #ff555f;
+    box-shadow: 0 0 8px rgba(255, 85, 95, 0.6);
+}
+
+.system-pill.backend-checking {
+    color: #e7b44d;
+    border-color: rgba(231, 180, 77, 0.25);
+    background: rgba(231, 180, 77, 0.07);
+}
+
+.system-pill.backend-checking .status-dot {
+    background: #e7b44d;
+}
+
+/* =========================================================
+   VIGIL SYSTEM STATUS
+   ========================================================= */
+
+.vigil-system-status {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 24px;
+    padding: 13px 17px;
+    border: 1px solid rgba(120, 160, 200, 0.1);
+    border-radius: 12px;
+    background: rgba(10, 20, 32, 0.55);
+}
+
+.vigil-system-status-title {
+    color: #62768c;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+}
+
+.vigil-system-status-items {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+}
+
+.vigil-system-status-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: #71859b;
+    font-size: 10px;
+}
+
+.vigil-system-status-item strong {
+    color: #cbd9e7;
+    font-size: 9px;
+    letter-spacing: 0.04em;
+}
+
+.vigil-status-indicator {
+    width: 6px;
+    height: 6px;
+    flex: 0 0 6px;
+    border-radius: 50%;
+    background: #71859b;
+}
+
+.vigil-status-indicator.online {
+    background: #55d99c;
+    box-shadow: 0 0 7px rgba(85, 217, 156, 0.5);
+}
+
+.vigil-status-indicator.offline {
+    background: #ff6262;
+    box-shadow: 0 0 7px rgba(255, 98, 98, 0.5);
+}
+
+.vigil-status-indicator.checking {
+    background: #e7b44d;
+}
+
+@media (max-width: 640px) {
+    .vigil-system-status {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .vigil-system-status-items {
+        width: 100%;
+        justify-content: space-between;
+        gap: 10px;
+    }
+}

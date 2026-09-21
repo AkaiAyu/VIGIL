@@ -515,6 +515,130 @@ function History() {
                                             </div>
 
                                         </div>
+                                        {/* CALLSHIELD SECURITY ANALYSIS */}
+
+                                        {entry.callShieldRiskLevel && (
+                                            <div className="history-callshield">
+
+                                                <div className="history-callshield-header">
+
+                                                    <div>
+                                                        <div className="history-callshield-eyebrow">
+                                                            CALLSHIELD SECURITY ANALYSIS
+                                                        </div>
+
+                                                        <div className="history-callshield-title">
+                                                            Conversation Threat Analysis
+                                                        </div>
+                                                    </div>
+
+                                                    <div
+                                                        className={`history-callshield-risk ${String(
+                                                            entry.callShieldRiskLevel
+                                                        ).toLowerCase()
+                                                            }`}
+                                                    >
+                                                        {entry.callShieldRiskLevel}
+                                                    </div>
+
+                                                </div>
+
+
+                                                <div className="history-callshield-stats">
+
+                                                    <div className="history-callshield-stat">
+
+                                                        <span>
+                                                            RISK SCORE
+                                                        </span>
+
+                                                        <strong>
+                                                            {
+                                                                entry.callShieldRiskScore ??
+                                                                0
+                                                            }
+                                                        </strong>
+
+                                                    </div>
+
+
+                                                    <div className="history-callshield-stat">
+
+                                                        <span>
+                                                            THREATS DETECTED
+                                                        </span>
+
+                                                        <strong>
+                                                            {
+                                                                Array.isArray(
+                                                                    entry.callShieldReasons
+                                                                )
+                                                                    ? entry.callShieldReasons.length
+                                                                    : 0
+                                                            }
+                                                        </strong>
+
+                                                    </div>
+
+                                                </div>
+
+
+                                                {Array.isArray(
+                                                    entry.callShieldReasons
+                                                ) &&
+                                                    entry.callShieldReasons.length >
+                                                    0 && (
+
+                                                        <div className="history-callshield-reasons">
+
+                                                            <div className="history-callshield-section-title">
+                                                                KEY THREATS
+                                                            </div>
+
+                                                            <ul>
+
+                                                                {entry.callShieldReasons.map(
+                                                                    (
+                                                                        reason,
+                                                                        index
+                                                                    ) => (
+                                                                        <li
+                                                                            key={
+                                                                                index
+                                                                            }
+                                                                        >
+                                                                            {
+                                                                                reason
+                                                                            }
+                                                                        </li>
+                                                                    )
+                                                                )}
+
+                                                            </ul>
+
+                                                        </div>
+
+                                                    )}
+
+
+                                                {entry.callShieldRecommendation && (
+                                                    <div className="history-callshield-recommendation">
+
+                                                        <div className="history-callshield-section-title">
+                                                            RECOMMENDATION
+                                                        </div>
+
+                                                        <p>
+                                                            {
+                                                                entry.callShieldRecommendation
+                                                            }
+                                                        </p>
+
+                                                    </div>
+                                                )}
+
+                                            </div>
+                                        )}
 
                                     </div>
 

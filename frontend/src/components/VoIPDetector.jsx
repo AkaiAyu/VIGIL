@@ -14,6 +14,7 @@ import {
     VolumeX,
     ShieldCheck,
     ShieldOff,
+    ShieldAlert,
 } from "lucide-react";
 
 const ROOM_ID = "vigil-demo";
@@ -26,6 +27,10 @@ function VoIPDetector() {
 
     const [isIncomingMuted, setIsIncomingMuted] = useState(false);
     const [isDetectorEnabled, setIsDetectorEnabled] = useState(true);
+    const [isCallShieldEnabled, setIsCallShieldEnabled] =
+        useState(true);
+    const callShieldEnabledRef =
+        useRef(true);
 
     const [error, setError] = useState(null);
 
@@ -36,10 +41,29 @@ function VoIPDetector() {
     const [voiceStatus, setVoiceStatus] = useState("standby");
     const [analysisCount, setAnalysisCount] = useState(0);
 
+    // CallShield conversation analysis
+    const [callShieldTranscript, setCallShieldTranscript] = useState("");
+    const [callShieldAnalysis, setCallShieldAnalysis] = useState(null);
+    const [callShieldStatus, setCallShieldStatus] = useState("standby");
+    const [showCallShieldPanel, setShowCallShieldPanel] =
+        useState(false);
+    const [showThreatAlert, setShowThreatAlert] =
+        useState(false);
+    const [threatTimeline, setThreatTimeline] = useState([]);
+    const [callSummary, setCallSummary] =
+        useState(null);
+
     const localStreamRef = useRef(null);
     const peerConnectionRef = useRef(null);
     const websocketRef = useRef(null);
     const remoteAudioRef = useRef(null);
+
+    const callShieldWebSocketRef = useRef(null);
+    const callShieldConfiguredRef = useRef(false);
+    const callShieldAnalysisRef =
+        useRef(null);
+    const threatTimelineRef =
+        useRef([]);
 
     const remoteStreamRef = useRef(null);
 
@@ -119,6 +143,11 @@ function VoIPDetector() {
             websocketRef.current = null;
         }
 
+        if (callShieldWebSocketRef.current) {
+            callShieldWebSocketRef.current.close();
+            callShieldWebSocketRef.current = null;
+        }
+
         if (localStreamRef.current) {
 
             localStreamRef.current
@@ -134,17 +163,18 @@ function VoIPDetector() {
         setIsConnecting(false);
         setIsMuted(false);
         setIsIncomingMuted(false);
-        setIsDetectorEnabled(true);
 
+        setIsDetectorEnabled(true);
         detectorEnabledRef.current = true;
+
+        setIsCallShieldEnabled(true);
+        callShieldEnabledRef.current = true;
+
+        setCallShieldStatus("standby");
 
         setConnectionState("offline");
         setCallRole("unknown");
 
-        // Clear previous call's detection data
-        setDetectionResult(null);
-        setVoiceStatus("standby");
-        setAnalysisCount(0);
     };
 
 
@@ -264,6 +294,172 @@ function VoIPDetector() {
             [view],
             { type: "audio/wav" }
         );
+    };
+
+
+    const connectCallShield = () => {
+        if (
+            callShieldWebSocketRef.current &&
+            callShieldWebSocketRef.current.readyState === WebSocket.OPEN
+        ) {
+            return;
+        }
+
+        const websocket = new WebSocket(
+            "ws://127.0.0.1:8000/ws/callshield"
+        );
+
+        callShieldWebSocketRef.current = websocket;
+
+        websocket.onopen = () => {
+            console.log(
+                "CALLSHIELD WebSocket connected."
+            );
+
+            callShieldConfiguredRef.current = false;
+        };
+
+        websocket.onmessage = (event) => {
+            try {
+                const message = JSON.parse(event.data);
+
+                console.log(
+                    "CALLSHIELD MESSAGE:",
+                    message
+                );
+
+                if (message.type === "status") {
+                    setCallShieldStatus(
+                        message.status || "connected"
+                    );
+
+                    return;
+                }
+
+                if (message.type === "transcript") {
+                    if (message.is_final && message.text) {
+                        setCallShieldTranscript(
+                            (previous) =>
+                                previous
+                                    ? `${previous} ${message.text}`
+                                    : message.text
+                        );
+                    }
+
+                    return;
+                }
+
+                if (message.type === "scam-analysis") {
+                    const analysis = message.analysis || null;
+                    callShieldAnalysisRef.current =
+                        analysis;
+
+                    setCallShieldAnalysis(analysis);
+                    setCallShieldStatus("analyzed");
+
+                    if (analysis) {
+                        const riskLevel = String(
+                            analysis.risk_level || "LOW"
+                        ).toUpperCase();
+
+                        const riskScore =
+                            Number(analysis.risk_score) || 0;
+
+                        const timelineEntry = {
+                            id: Date.now(),
+                            time: new Date().toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                second: "2-digit",
+                            }),
+                            riskLevel,
+                            riskScore,
+                            reasons: Array.isArray(
+                                analysis.reasons
+                            )
+                                ? analysis.reasons
+                                : [],
+                        };
+
+                        threatTimelineRef.current = [
+                            ...threatTimelineRef.current,
+                            timelineEntry,
+                        ];
+
+                        setThreatTimeline(
+                            threatTimelineRef.current
+                        );
+
+                        if (
+                            ["HIGH", "CRITICAL"].includes(
+                                riskLevel
+                            )
+                        ) {
+                            setShowThreatAlert(true);
+                        }
+                    }
+
+                    return;
+                }
+
+                if (message.type === "scam-analysis-error") {
+                    console.error(
+                        "CALLSHIELD AI ANALYSIS ERROR:",
+                        message.message
+                    );
+
+                    setCallShieldStatus("error");
+
+                    return;
+                }
+
+            } catch (error) {
+                console.error(
+                    "Invalid CallShield message:",
+                    error
+                );
+            }
+        };
+
+        websocket.onerror = (event) => {
+            console.error(
+                "CALLSHIELD WebSocket error:",
+                event
+            );
+        };
+
+        websocket.onclose = () => {
+            console.log(
+                "CALLSHIELD WebSocket closed."
+            );
+
+            callShieldConfiguredRef.current = false;
+            callShieldWebSocketRef.current = null;
+        };
+    };
+
+
+    const float32ToInt16Buffer = (samples) => {
+        const int16Samples =
+            new Int16Array(samples.length);
+
+        for (
+            let i = 0;
+            i < samples.length;
+            i++
+        ) {
+            const sample = Math.max(
+                -1,
+                Math.min(1, samples[i])
+            );
+
+            int16Samples[i] =
+                sample < 0
+                    ? sample * 0x8000
+                    : sample * 0x7fff;
+        }
+
+        return int16Samples.buffer;
     };
 
 
@@ -431,10 +627,6 @@ function VoIPDetector() {
     const startRemotePCMRecording = async (stream) => {
         const sessionId = callSessionRef.current;
 
-        if (!detectorEnabledRef.current) {
-            return;
-        }
-
         if (!stream) {
             return;
         }
@@ -510,10 +702,6 @@ function VoIPDetector() {
                     return;
                 }
 
-                if (!detectorEnabledRef.current) {
-                    return;
-                }
-
                 const samples =
                     event.data.samples;
 
@@ -521,6 +709,44 @@ function VoIPDetector() {
                     event.data.sampleRate;
 
                 if (!samples || !samples.length) {
+                    return;
+                }
+
+                // ---------------------------------------------
+                // Send remote audio to CallShield
+                // ---------------------------------------------
+
+                if (callShieldEnabledRef.current) {
+                    const callShieldWebSocket =
+                        callShieldWebSocketRef.current;
+
+                    if (
+                        callShieldWebSocket &&
+                        callShieldWebSocket.readyState ===
+                        WebSocket.OPEN
+                    ) {
+                        if (!callShieldConfiguredRef.current) {
+                            callShieldWebSocket.send(
+                                JSON.stringify({
+                                    type: "config",
+                                    sample_rate: sampleRate,
+                                })
+                            );
+
+                            callShieldConfiguredRef.current =
+                                true;
+                        }
+
+                        const pcmBuffer =
+                            float32ToInt16Buffer(samples);
+
+                        callShieldWebSocket.send(
+                            pcmBuffer
+                        );
+                    }
+                }
+
+                if (!detectorEnabledRef.current) {
                     return;
                 }
 
@@ -662,6 +888,8 @@ function VoIPDetector() {
             );
 
             remoteWindowNumberRef.current = 0;
+
+            connectCallShield();
 
             startRemotePCMRecording(
                 remoteStream
@@ -820,6 +1048,25 @@ function VoIPDetector() {
 
 
     const startCall = async () => {
+        // Clear results from the previous call.
+        setDetectionResult(null);
+        setVoiceStatus("standby");
+        setAnalysisCount(0);
+
+        setCallShieldTranscript("");
+        setCallShieldAnalysis(null);
+        setCallShieldStatus("standby");
+
+        setIsCallShieldEnabled(true);
+        callShieldEnabledRef.current = true;
+
+        setShowCallShieldPanel(false);
+        setShowThreatAlert(false);
+        setThreatTimeline([]);
+        setCallSummary(null);
+        callShieldAnalysisRef.current = null;
+        threatTimelineRef.current = [];
+
         try {
             // Create a new session for every call
             callSessionRef.current += 1;
@@ -974,6 +1221,7 @@ function VoIPDetector() {
                     );
 
                     setCallRole("monitor");
+                    setShowCallShieldPanel(true);
 
                     await handleOffer(
                         message.offer
@@ -1266,6 +1514,74 @@ function VoIPDetector() {
                 model:
                     speechResults[0]?.model ||
                     "DF-Arena 1B",
+
+
+                // CallShield conversation analysis
+                ...(callShieldAnalysis
+                    ? {
+                        callShieldRiskLevel:
+                            callShieldAnalysis.risk_level ||
+                            "LOW",
+
+                        callShieldRiskScore:
+                            Number(
+                                callShieldAnalysis.risk_score || 0
+                            ),
+
+                        callShieldReasons:
+                            Array.isArray(
+                                callShieldAnalysis.reasons
+                            )
+                                ? callShieldAnalysis.reasons
+                                : [],
+
+                        callShieldRecommendation:
+                            callShieldAnalysis.recommendation ||
+                            "",
+
+                        callShieldTranscript:
+                            callShieldTranscript || "",
+                    }
+                    : {}),
+
+                // --------------------------------------------------
+                // CALLSHIELD SECURITY ANALYSIS
+                // --------------------------------------------------
+
+                conversationRisk:
+                    callShieldAnalysisRef.current?.risk_level ||
+                    "UNKNOWN",
+
+                conversationRiskScore:
+                    Number(
+                        callShieldAnalysisRef.current?.risk_score
+                    ) || 0,
+
+                threatCount:
+                    threatTimelineRef.current.length,
+
+                threatTimeline:
+                    threatTimelineRef.current.map(
+                        (event) => ({
+                            time: event.time,
+                            riskLevel: event.riskLevel,
+                            riskScore: event.riskScore,
+                            reason:
+                                event.reasons?.[0] ||
+                                "",
+                        })
+                    ),
+
+                threatReasons:
+                    Array.isArray(
+                        callShieldAnalysisRef.current?.reasons
+                    )
+                        ? callShieldAnalysisRef.current.reasons.slice(0, 5)
+                        : [],
+
+                conversationRecommendation:
+                    callShieldAnalysisRef.current?.recommendation ||
+                    "",
             });
         }
 
@@ -1318,6 +1634,102 @@ function VoIPDetector() {
             "Final VoIP analysis completed. Saving session history."
         );
 
+        const results =
+            voipSessionResultsRef.current;
+
+        const totalWindows =
+            results.length;
+
+        const aiWindows =
+            results.filter(
+                (result) =>
+                    result.verdict === "AI"
+            ).length;
+
+        const genuineWindows =
+            results.filter(
+                (result) =>
+                    result.verdict === "GENUINE"
+            ).length;
+
+        const averageAiProbability =
+            totalWindows > 0
+                ? results.reduce(
+                    (sum, result) =>
+                        sum +
+                        Number(
+                            result.aiProbabilityAverage || 0
+                        ),
+                    0
+                ) / totalWindows
+                : 0;
+
+        const averageGenuineProbability =
+            totalWindows > 0
+                ? results.reduce(
+                    (sum, result) =>
+                        sum +
+                        Number(
+                            result.genuineProbability || 0
+                        ),
+                    0
+                ) / totalWindows
+                : 0;
+
+        const peakAiProbability =
+            totalWindows > 0
+                ? Math.max(
+                    ...results.map(
+                        (result) =>
+                            Number(
+                                result.aiProbability || 0
+                            )
+                    )
+                )
+                : 0;
+
+        const duration =
+            voipSessionStartRef.current
+                ? (
+                    (Date.now() -
+                        voipSessionStartRef.current) /
+                    1000
+                )
+                : 0;
+
+        setCallSummary({
+            duration,
+            totalWindows,
+            aiWindows,
+            genuineWindows,
+            averageAiProbability,
+            averageGenuineProbability,
+            peakAiProbability,
+
+            riskLevel:
+                callShieldAnalysis?.risk_level ||
+                "UNKNOWN",
+
+            riskScore:
+                Number(
+                    callShieldAnalysis?.risk_score
+                ) || 0,
+
+            threatCount:
+                threatTimeline.length,
+
+            reasons:
+                Array.isArray(
+                    callShieldAnalysis?.reasons
+                )
+                    ? callShieldAnalysis.reasons
+                    : [],
+
+            recommendation:
+                callShieldAnalysis?.recommendation ||
+                "No recommendation available.",
+        });
+
         saveVoipSessionToHistory();
 
         cleanup();
@@ -1368,6 +1780,59 @@ function VoIPDetector() {
     };
 
 
+    const toggleCallShield = () => {
+        if (
+            callRole !== "monitor" ||
+            !isConnected
+        ) {
+            return;
+        }
+
+        const nextEnabled =
+            !callShieldEnabledRef.current;
+
+        callShieldEnabledRef.current =
+            nextEnabled;
+
+        setIsCallShieldEnabled(
+            nextEnabled
+        );
+
+        if (!nextEnabled) {
+            console.log(
+                "CALLSHIELD disabled."
+            );
+
+            setCallShieldStatus(
+                "disabled"
+            );
+
+            return;
+        }
+
+        console.log(
+            "CALLSHIELD enabled."
+        );
+
+        setCallShieldStatus(
+            "standby"
+        );
+
+        // If the WebSocket is still connected,
+        // audio will resume automatically.
+        // Reconnect only if it was closed.
+        const websocket =
+            callShieldWebSocketRef.current;
+
+        if (
+            !websocket ||
+            websocket.readyState !== WebSocket.OPEN
+        ) {
+            connectCallShield();
+        }
+    };
+
+
     const toggleDetector = async () => {
         if (
             callRole !== "monitor" ||
@@ -1386,46 +1851,10 @@ function VoIPDetector() {
 
         if (!nextEnabled) {
             console.log(
-                "VIGIL detector disabled."
+                "VIGIL DF-Arena detector disabled. CallShield remains active."
             );
 
-            // Stop the current PCM worklet.
-            if (remotePcmWorkletRef.current) {
-                remotePcmWorkletRef.current.port.postMessage(
-                    "reset"
-                );
-
-                remotePcmWorkletRef.current.disconnect();
-                remotePcmWorkletRef.current = null;
-            }
-
-            // Disconnect the remote audio source.
-            if (remoteAudioSourceRef.current) {
-                remoteAudioSourceRef.current.disconnect();
-                remoteAudioSourceRef.current = null;
-            }
-
-            // Disconnect the silent output node.
-            if (remoteSilentGainRef.current) {
-                remoteSilentGainRef.current.disconnect();
-                remoteSilentGainRef.current = null;
-            }
-
-            // Close the AudioContext completely.
-            if (remoteAudioContextRef.current) {
-                try {
-                    await remoteAudioContextRef.current.close();
-                } catch (error) {
-                    console.warn(
-                        "Could not close remote AudioContext:",
-                        error
-                    );
-                }
-
-                remoteAudioContextRef.current = null;
-            }
-
-            // Discard any queued windows.
+            // Stop only pending DF-Arena analysis.
             remoteAnalysisQueueRef.current = [];
 
             setVoiceStatus("standby");
@@ -1433,15 +1862,13 @@ function VoIPDetector() {
 
         } else {
             console.log(
-                "VIGIL detector enabled."
+                "VIGIL DF-Arena detector enabled."
             );
 
-            // Start a fresh detection pipeline.
-            if (remoteStreamRef.current) {
-                await startRemotePCMRecording(
-                    remoteStreamRef.current
-                );
-            }
+            // The existing AudioWorklet remains active.
+            // CallShield never stopped, so DF-Arena will
+            // automatically resume processing new audio.
+            setVoiceStatus("standby");
         }
     };
 
@@ -1455,6 +1882,24 @@ function VoIPDetector() {
         };
 
     }, []);
+
+    const formatCallDuration = (seconds) => {
+        const totalSeconds =
+            Math.max(
+                0,
+                Math.round(seconds || 0)
+            );
+
+        const minutes =
+            Math.floor(totalSeconds / 60);
+
+        const remainingSeconds =
+            totalSeconds % 60;
+
+        return `${String(minutes).padStart(2, "0")}:${String(
+            remainingSeconds
+        ).padStart(2, "0")}`;
+    };
 
 
     return (
@@ -1664,6 +2109,29 @@ function VoIPDetector() {
                                 )}
 
 
+                                {/* RECEIVER ONLY: Enable / disable CallShield */}
+                                {callRole === "monitor" && (
+                                    <button
+                                        className={`control-button ${!isCallShieldEnabled
+                                            ? "muted"
+                                            : ""
+                                            }`}
+                                        onClick={toggleCallShield}
+                                        title={
+                                            isCallShieldEnabled
+                                                ? "Disable CallShield"
+                                                : "Enable CallShield"
+                                        }
+                                    >
+                                        {isCallShieldEnabled ? (
+                                            <ShieldAlert size={20} />
+                                        ) : (
+                                            <ShieldOff size={20} />
+                                        )}
+                                    </button>
+                                )}
+
+
                                 {/* Existing END CALL */}
                                 <button
                                     className="end-call-button"
@@ -1745,8 +2213,22 @@ function VoIPDetector() {
                             }`}
                     >
 
-                        <div className="voip-result-label">
-                            VIGIL DETECTION
+                        <div className="voip-result-header">
+                            <div className="voip-result-label">
+                                VIGIL DETECTION
+                            </div>
+
+                            <button
+                                className="voip-result-close"
+                                onClick={() => {
+                                    setDetectionResult(null);
+                                    setVoiceStatus("standby");
+                                    setAnalysisCount(0);
+                                }}
+                                aria-label="Close voice detection analysis"
+                            >
+                                ×
+                            </button>
                         </div>
 
                         <div className="voip-result-title">
@@ -1772,6 +2254,457 @@ function VoIPDetector() {
 
                     </div>
 
+                )}
+
+
+                {/* REAL-TIME THREAT ALERT */}
+
+                {showThreatAlert &&
+                    callShieldAnalysis &&
+                    ["HIGH", "CRITICAL"].includes(
+                        String(
+                            callShieldAnalysis.risk_level || ""
+                        ).toUpperCase()
+                    ) && (
+                        <div
+                            className={`threat-alert ${String(
+                                callShieldAnalysis.risk_level
+                            ).toLowerCase()
+                                }`}
+                        >
+                            <div className="threat-alert-header">
+                                <div className="threat-alert-icon">
+                                    ⚠
+                                </div>
+
+                                <div>
+                                    <div className="threat-alert-label">
+                                        VIGIL THREAT DETECTED
+                                    </div>
+
+                                    <div className="threat-alert-title">
+                                        {String(
+                                            callShieldAnalysis.risk_level
+                                        ).toUpperCase()} SOCIAL ENGINEERING RISK
+                                    </div>
+                                </div>
+
+                                <button
+                                    className="threat-alert-close"
+                                    onClick={() =>
+                                        setShowThreatAlert(false)
+                                    }
+                                    aria-label="Dismiss threat alert"
+                                >
+                                    ×
+                                </button>
+                            </div>
+
+                            <div className="threat-alert-content">
+                                {Array.isArray(
+                                    callShieldAnalysis.reasons
+                                ) &&
+                                    callShieldAnalysis.reasons.length > 0 && (
+                                        <ul>
+                                            {callShieldAnalysis.reasons
+                                                .slice(0, 3)
+                                                .map((reason, index) => (
+                                                    <li key={index}>
+                                                        {reason}
+                                                    </li>
+                                                ))}
+                                        </ul>
+                                    )}
+                            </div>
+
+                            <div className="threat-alert-actions">
+                                <button
+                                    className="threat-alert-dismiss"
+                                    onClick={() =>
+                                        setShowThreatAlert(false)
+                                    }
+                                >
+                                    DISMISS
+                                </button>
+
+                                <button
+                                    className="threat-alert-end"
+                                    onClick={endCall}
+                                >
+                                    <PhoneOff size={16} />
+                                    END CALL
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+
+                {/* CALLSHIELD ANALYSIS */}
+
+                {showCallShieldPanel && (
+                    <div className="callshield-panel">
+
+                        <div className="callshield-header">
+                            <div>
+                                <div className="callshield-label">
+                                    CALLSHIELD
+                                </div>
+
+                                <div className="callshield-title">
+                                    Conversation Threat Analysis
+                                </div>
+                            </div>
+
+                            <div className="callshield-header-right">
+                                <div
+                                    className={`callshield-status ${callShieldStatus}`}
+                                >
+                                    {callShieldStatus === "disabled"
+                                        ? "OFF"
+                                        : callShieldStatus === "analyzed"
+                                            ? "ANALYZED"
+                                            : callShieldStatus === "connected"
+                                                ? "MONITORING"
+                                                : "STANDBY"}
+                                </div>
+
+                                <button
+                                    className="callshield-close"
+                                    onClick={() => {
+                                        setCallShieldTranscript("");
+                                        setCallShieldAnalysis(null);
+                                        setCallShieldStatus("standby");
+                                        setShowCallShieldPanel(false);
+                                    }}
+                                    aria-label="Close CallShield analysis"
+                                >
+                                    ×
+                                </button>
+                            </div>
+                        </div>
+
+                        {callShieldTranscript && (
+                            <div className="callshield-transcript">
+                                <div className="callshield-section-label">
+                                    LIVE TRANSCRIPT
+                                </div>
+
+                                <div className="callshield-transcript-text">
+                                    {callShieldTranscript}
+                                </div>
+                            </div>
+                        )}
+
+                        {callShieldAnalysis && (
+                            <div
+                                className={`callshield-risk ${String(
+                                    callShieldAnalysis.risk_level || "LOW"
+                                ).toLowerCase()}`}
+                            >
+
+                                <div className="callshield-risk-top">
+
+                                    <div>
+                                        <div className="callshield-section-label">
+                                            SOCIAL ENGINEERING RISK
+                                        </div>
+
+                                        <div className="callshield-risk-level">
+                                            {callShieldAnalysis.risk_level ||
+                                                "UNKNOWN"}
+                                        </div>
+                                    </div>
+
+                                    <div className="callshield-risk-score">
+                                        {Number(
+                                            callShieldAnalysis.risk_score || 0
+                                        )}
+                                    </div>
+
+                                </div>
+
+                                {Array.isArray(
+                                    callShieldAnalysis.reasons
+                                ) &&
+                                    callShieldAnalysis.reasons.length > 0 && (
+                                        <div className="callshield-reasons">
+
+                                            <div className="callshield-section-label">
+                                                DETECTED INDICATORS
+                                            </div>
+
+                                            <ul>
+                                                {callShieldAnalysis.reasons.map(
+                                                    (reason, index) => (
+                                                        <li key={index}>
+                                                            {reason}
+                                                        </li>
+                                                    )
+                                                )}
+                                            </ul>
+
+                                        </div>
+                                    )}
+
+                                {callShieldAnalysis.recommendation && (
+                                    <div className="callshield-recommendation">
+
+                                        <div className="callshield-section-label">
+                                            RECOMMENDATION
+                                        </div>
+
+                                        <div>
+                                            {
+                                                callShieldAnalysis.recommendation
+                                            }
+                                        </div>
+
+                                    </div>
+                                )}
+
+                            </div>
+                        )}
+
+                        {threatTimeline.length > 0 && (
+                            <div className="callshield-timeline">
+                                <div className="callshield-section-label">
+                                    THREAT TIMELINE
+                                </div>
+
+                                <div className="callshield-timeline-list">
+                                    {threatTimeline.map((event) => (
+                                        <div
+                                            className={`callshield-timeline-item ${event.riskLevel.toLowerCase()}`}
+                                            key={event.id}
+                                        >
+                                            <div className="callshield-timeline-marker" />
+
+                                            <div className="callshield-timeline-content">
+                                                <div className="callshield-timeline-top">
+                                                    <span className="callshield-timeline-time">
+                                                        {event.time}
+                                                    </span>
+
+                                                    <span className="callshield-timeline-risk">
+                                                        {event.riskLevel}
+                                                    </span>
+
+                                                    <span className="callshield-timeline-score">
+                                                        {event.riskScore}
+                                                    </span>
+                                                </div>
+
+                                                {event.reasons.length > 0 && (
+                                                    <div className="callshield-timeline-reason">
+                                                        {event.reasons[0]}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {!callShieldTranscript &&
+                            !callShieldAnalysis &&
+                            callShieldStatus !== "error" && (
+                                <div className="callshield-empty">
+                                    Listening for conversation content...
+                                </div>
+                            )}
+
+                        {callShieldStatus === "error" && (
+                            <div className="callshield-error">
+                                Conversation analysis is currently unavailable.
+                            </div>
+                        )}
+
+                    </div>
+                )}
+
+
+                {/* POST-CALL SECURITY SUMMARY */}
+
+                {callSummary && (
+                    <div className="call-summary-panel">
+
+                        <div className="call-summary-header">
+                            <div>
+                                <div className="call-summary-label">
+                                    VIGIL REPORT
+                                </div>
+
+                                <div className="call-summary-title">
+                                    Call Security Summary
+                                </div>
+                            </div>
+
+                            <div className="call-summary-ended">
+                                CALL ENDED
+                            </div>
+                        </div>
+
+
+                        {/* OVERVIEW */}
+
+                        <div className="call-summary-grid">
+
+                            <div className="call-summary-stat">
+                                <span>DURATION</span>
+
+                                <strong>
+                                    {formatCallDuration(
+                                        callSummary.duration
+                                    )}
+                                </strong>
+                            </div>
+
+
+                            <div className="call-summary-stat">
+                                <span>VOICE WINDOWS</span>
+
+                                <strong>
+                                    {callSummary.totalWindows}
+                                </strong>
+                            </div>
+
+
+                            <div className="call-summary-stat">
+                                <span>AI VOICE WINDOWS</span>
+
+                                <strong>
+                                    {callSummary.aiWindows}
+                                </strong>
+                            </div>
+
+
+                            <div className="call-summary-stat">
+                                <span>GENUINE WINDOWS</span>
+
+                                <strong>
+                                    {callSummary.genuineWindows}
+                                </strong>
+                            </div>
+
+                        </div>
+
+
+                        {/* VOICE AUTHENTICITY */}
+
+                        <div className="call-summary-section">
+
+                            <div className="callshield-section-label">
+                                VOICE AUTHENTICITY
+                            </div>
+
+                            <div className="call-summary-authenticity">
+
+                                <div>
+                                    <strong>
+                                        {
+                                            callSummary
+                                                .averageGenuineProbability
+                                                .toFixed(1)
+                                        }%
+                                    </strong>
+
+                                    <span>
+                                        Average genuine probability
+                                    </span>
+                                </div>
+
+                                <div>
+                                    <strong>
+                                        {
+                                            callSummary
+                                                .peakAiProbability
+                                                .toFixed(1)
+                                        }%
+                                    </strong>
+
+                                    <span>
+                                        Peak AI probability
+                                    </span>
+                                </div>
+
+                            </div>
+
+                        </div>
+
+
+                        {/* CONVERSATION RISK */}
+
+                        <div
+                            className={`call-summary-risk ${String(
+                                callSummary.riskLevel
+                            ).toLowerCase()
+                                }`}
+                        >
+
+                            <div className="call-summary-risk-header">
+
+                                <div>
+                                    <div className="callshield-section-label">
+                                        CONVERSATION RISK
+                                    </div>
+
+                                    <div className="call-summary-risk-level">
+                                        {callSummary.riskLevel}
+                                    </div>
+                                </div>
+
+                                <div className="call-summary-risk-score">
+                                    {callSummary.riskScore}
+                                </div>
+
+                            </div>
+
+                        </div>
+
+
+                        {/* THREATS */}
+
+                        {callSummary.reasons.length > 0 && (
+                            <div className="call-summary-section">
+
+                                <div className="callshield-section-label">
+                                    KEY THREATS DETECTED
+                                </div>
+
+                                <ul className="call-summary-reasons">
+
+                                    {callSummary.reasons
+                                        .slice(0, 5)
+                                        .map(
+                                            (reason, index) => (
+                                                <li key={index}>
+                                                    {reason}
+                                                </li>
+                                            )
+                                        )}
+
+                                </ul>
+
+                            </div>
+                        )}
+
+
+                        {/* RECOMMENDATION */}
+
+                        <div className="call-summary-recommendation">
+
+                            <div className="callshield-section-label">
+                                RECOMMENDATION
+                            </div>
+
+                            <div>
+                                {callSummary.recommendation}
+                            </div>
+
+                        </div>
+
+                    </div>
                 )}
 
 

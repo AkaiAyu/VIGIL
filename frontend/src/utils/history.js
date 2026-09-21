@@ -81,7 +81,7 @@ export function isHistoryAutoSaveEnabled() {
 export function isConfidenceVisible() {
     try {
         const stored =
-            localStorage.getItem("vigil_settings");
+            localStorage.getItem(SETTINGS_KEY);
 
         if (!stored) {
             return true;
